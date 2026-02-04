@@ -8,4 +8,5 @@ This project is an algorithm visualizer. Through it, I aim to make algorithms mo
 ​🎨 一个拒绝“模式化”的算法可视化系统。深度重构 UI 交互，还原算法最真实的行为逻辑。
 
 如果你想了解我是如何构思的，请点击design-thoughts.md.
- If you're interested in how I came up with this idea,please click design-thoughts.md.
+
+If you're interested in how I came up with this idea,please click design-thoughts.md.
