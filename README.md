@@ -1,5 +1,5 @@
 # Algorithm-Visualizer
-Demo（演示地址）：https://github.com/wuyulian47/Algorithm-Visualizer
+Demo（演示地址）：https://wuyulian47.github.io/Algorithm-Visualizer/
 
 Usage: After downloading this project, simply double-click the index.html file in the root directory to enter the algorithm navigation center.
 （运行说明：下载本项目后，请直接双击运行根目录下的 index.html，即可进入算法导航中心。）
