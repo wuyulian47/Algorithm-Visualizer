@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>桶排序可视化 | Bucket Sort Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --bg-gradient: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg-gradient);
+            color: #334155;
+            min-height: 100vh;
+        }
+
+        /* 玻璃拟态效果 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+
+        /* 舞台容器 */
+        .stage-container {
+            position: relative;
+            height: 420px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end; /* 底部对齐 */
+            padding: 20px;
+            /* 关键：允许溢出显示，以便底部的桶标签可见 */
+            overflow: visible; 
+        }
+
+        /* 初始序列容器 */
+        .source-row {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            height: 150px;
+            border-bottom: 1px dashed #cbd5e1;
+            display: flex;
+            align-items: flex-end; 
+        }
+
+        /* 元素块通用样式 - 优化丝滑过渡 */
+        .array-item {
+            position: absolute;
+            background-color: #60a5fa;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 800;
+            font-size: 14px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            
+            /* 核心修改：使用 cubic-bezier 实现类似物理重力的丝滑移动 */
+            /* all 包含 left, top, width, height, transform, background-color */
+            transition: all 0.6s cubic-bezier(0.22, 1, 0.36, 1); 
+            
+            z-index: 20;
+            will-change: left, top, transform; /* 性能优化 */
+        }
+        
+        .mode-block .array-item { border-radius: 8px; }
+        .mode-bar .array-item { border-radius: 4px 4px 2px 2px; align-items: flex-end; padding-bottom: 5px; }
+
+        /* 桶区域 */
+        .bucket-row {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            height: 200px;
+            width: 100%;
+            margin-top: auto;
+            position: relative;
+            z-index: 10;
+        }
+
+        .bucket {
+            width: 18%;
+            height: 100%;
+            background: rgba(241, 245, 249, 0.5);
+            border: 2px dashed #cbd5e1;
+            border-radius: 0 0 12px 12px;
+            border-top: none;
+            position: relative;
+            display: flex;
+            justify-content: center;
+        }
+
+        .bucket-label {
+            position: absolute;
+            bottom: -32px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 800;
+            color: #475569;
+            background: #fff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            border: 1px solid #e2e8f0;
+            white-space: nowrap;
+            z-index: 5;
+        }
+
+        /* 状态颜色 */
+        .color-default { background-color: #60a5fa; } 
+        .color-moving { 
+            background-color: #f59e0b !important; /* Amber */
+            box-shadow: 0 10px 20px rgba(245, 158, 11, 0.3);
+            z-index: 50; /* 移动时层级最高 */
+            transform: scale(1.1); /* 移动时稍微放大 */
+        }
+        .color-in-bucket { background-color: #8b5cf6 !important; } /* Purple */
+        .color-sorted { background-color: #10b981 !important; } /* Emerald */
+
+        /* 代码高亮区 */
+        .code-block {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            background: #1e293b;
+            color: #94a3b8;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            line-height: 1.6;
+        }
+        .code-line {
+            padding: 0 4px;
+            border-radius: 2px;
+            transition: all 0.2s;
+            display: block;
+        }
+        .code-active {
+            background: rgba(59, 130, 246, 0.3);
+            color: #ffffff;
+            border-left: 2px solid #3b82f6;
+            margin-left: -2px;
+        }
+
+        /* 终端日志 */
+        .log-container {
+            font-family: 'JetBrains Mono', monospace;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #3b82f6;
+        }
+        .log-entry { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: 0; } }
+
+        /* 布局逻辑 */
+        .layout-default .main-grid { display: flex; flex-direction: column; gap: 1.5rem; }
+        .layout-sidebar .main-grid { display: grid; grid-template-columns: 1fr 350px; gap: 1.5rem; }
+        @media (max-width: 1024px) { .layout-sidebar .main-grid { grid-template-columns: 1fr; } }
+
+        /* 状态指示灯 */
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .dot-running { background: #10b981; animation: pulse 1.5s infinite; }
+        .dot-paused { background: #f59e0b; }
+        .dot-idle { background: #94a3b8; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <div class="flex items-center gap-3 mb-1">
+                    <div class="p-2 bg-blue-600 rounded-xl text-white shadow-lg shadow-blue-200">
+                        <i class="fas fa-bitbucket fa-lg"></i>
+                    </div>
+                    <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">桶排序</h1>
+                </div>
+                <p class="text-slate-500 font-medium">Bucket Sort Visualization Hub</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="layoutToggle" class="glass-card px-5 py-2.5 rounded-xl text-slate-700 font-semibold hover:bg-white transition flex items-center gap-2">
+                    <i class="fas fa-columns text-blue-500"></i> 视图切换
+                </button>
+            </div>
+        </header>
+
+        <div id="mainContent" class="layout-default">
+            
+            <!-- Control Panel -->
+            <section class="glass-card rounded-2xl p-6 mb-6">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-end">
+                    
+                    <!-- Visualization Mode -->
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase block mb-2">显示模式</label>
+                        <select id="viewMode" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-sm font-medium text-slate-700">
+                            <option value="block">🧊 等高色块图</option>
+                            <option value="bar">📊 高度柱状图</option>
+                        </select>
+                    </div>
+
+                    <!-- Size Control -->
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">数据规模</label>
+                            <span id="sizeValue" class="text-blue-600 font-bold font-mono text-sm">8</span>
+                        </div>
+                        <input type="range" id="sizeSlider" min="3" max="12" value="8" class="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                    </div>
+                    
+                    <!-- Speed Control -->
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">动画速度</label>
+                            <span id="speedValue" class="text-blue-600 font-bold font-mono text-sm">5</span>
+                        </div>
+                        <input type="range" id="speedSlider" min="1" max="10" value="5" class="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                    </div>
+
+                    <!-- Custom Input -->
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase block mb-2">自定义数据</label>
+                        <input type="text" id="customInput" placeholder="例: 12, 45, 8" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-sm font-mono">
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button id="generateBtn" class="bg-blue-50 text-blue-600 h-10 px-4 rounded-xl font-bold hover:bg-blue-100 transition border border-blue-100 flex items-center justify-center gap-2">
+                        <i class="fas fa-sync-alt"></i> 生成
+                    </button>
+                </div>
+            </section>
+
+            <div class="main-grid">
+                <!-- Left Section: Visualization -->
+                <div class="space-y-6">
+                    <section class="glass-card rounded-3xl p-6 relative flex flex-col">
+                        <!-- Status Bar -->
+                        <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100 flex-wrap gap-4">
+                            <div class="flex items-center gap-4">
+                                <span class="flex items-center text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-1.5 rounded-full shadow-sm">
+                                    <span id="statusIndicator" class="status-dot dot-idle"></span>
+                                    <span id="statusText">准备就绪</span>
+                                </span>
+                            </div>
+                            <!-- Metrics -->
+                            <div class="flex items-center gap-3">
+                                <div class="text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
+                                    <i class="fas fa-stopwatch text-blue-400"></i>
+                                    <span class="text-slate-500 font-semibold">耗时:</span>
+                                    <span id="timerDisplay" class="font-mono font-bold text-slate-700">0.0s</span>
+                                </div>
+                                <div class="text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
+                                    <i class="fas fa-exchange-alt text-green-400"></i>
+                                    <span class="text-slate-500 font-semibold">移动:</span>
+                                    <span id="moveCount" class="font-mono font-bold text-slate-700">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visualization Container -->
+                        <!-- 保留设计：mb-12 让底部桶标签完全露出 -->
+                        <div id="stage" class="stage-container mb-12 mode-block">
+                            <!-- Helper line for Initial Position -->
+                            <div class="source-row" id="sourceRow"></div>
+
+                            <!-- Array Items will be injected here via JS -->
+                            
+                            <!-- Buckets Area -->
+                            <div class="bucket-row" id="bucketRow">
+                                <!-- Buckets will be injected here via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="flex flex-wrap justify-center gap-3 z-30">
+                            <button id="startBtn" class="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-play"></i> 开始排序
+                            </button>
+                            <button id="pauseBtn" disabled class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                                <i class="fas fa-pause"></i> 暂停
+                            </button>
+                            <button id="restoreBtn" class="px-6 py-2.5 bg-purple-50 border border-purple-100 text-purple-600 rounded-xl font-bold hover:bg-purple-100 transition active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-undo"></i> 还原
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Terminal Log -->
+                    <section class="log-container rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                            <div class="flex items-center gap-2 text-slate-700 text-xs font-bold uppercase tracking-widest">
+                                <i class="fas fa-terminal text-blue-500"></i> 执行日志
+                            </div>
+                        </div>
+                        <div id="logContent" class="h-32 overflow-y-auto space-y-1.5 text-sm scrollbar-hide px-1">
+                            <div class="text-slate-500 flex items-start gap-2">
+                                <span class="text-blue-400 font-bold">></span> 
+                                <span>等待系统指令...</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right Section: Algorithm Info & Code -->
+                <aside class="glass-card rounded-2xl p-6 border-t-4 border-blue-500 h-full flex flex-col gap-6">
+                    
+                    <!-- Code Trace -->
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-code text-purple-500"></i> 伪代码监控
+                        </h3>
+                        <div class="code-block shadow-inner">
+                            <span class="code-line" id="line-0">init buckets = Array(5)</span>
+                            <span class="code-line" id="line-1">for x in array:</span>
+                            <span class="code-line" id="line-2">  idx = floor(x / 20)</span>
+                            <span class="code-line" id="line-3">  buckets[idx].push(x)</span>
+                            <span class="code-line" id="line-4">for b in buckets:</span>
+                            <span class="code-line" id="line-5">  sort(b)</span>
+                            <span class="code-line" id="line-6">result = flatten(buckets)</span>
+                        </div>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-3">图例说明</h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs font-medium text-slate-600">
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-blue-400"></div>待排序</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-amber-500"></div>移动中</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-purple-500"></div>桶内元素</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-emerald-500"></div>已完成</div>
+                        </div>
+                    </div>
+
+                    <!-- Algorithm Details -->
+                    <div class="text-slate-600 text-sm">
+                        <h4 class="font-bold text-slate-800 mb-2">💡 算法核心</h4>
+                        <p class="leading-relaxed mb-4">将数据分到有限数量的桶里，对每个桶里的数据进行排序，最后将各个桶中的数据有序合并。</p>
+                        
+                        <div class="flex flex-wrap gap-2 mb-2">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold">平均: O(n+k)</span>
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">空间: O(n+k)</span>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-slate-400 text-xs pb-4">
+            <p>Bucket Sort Pro Visualization</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- 状态与变量 ---
+        let rawData = [];
+        let originalData = [];
+        let domElements = []; // {val: number, el: HTMLElement, idx: number}
+        let buckets = []; 
+        
+        let state = {
+            isSorting: false,
+            isPaused: false,
+            stopFlag: false,
+            moves: 0,
+            startTime: 0,
+            timerInterval: null
+        };
+
+        let vizMode = 'block'; // 'block' or 'bar'
+        let speedConfig = 1100;
+        const bucketCount = 5;
+        const bucketSize = 20; // 0-19, 20-39...
+
+        // --- DOM 引用 ---
+        const els = {
+            stage: document.getElementById('stage'),
+            sourceRow: document.getElementById('sourceRow'),
+            bucketRow: document.getElementById('bucketRow'),
+            sizeSlider: document.getElementById('sizeSlider'),
+            sizeValue: document.getElementById('sizeValue'),
+            speedSlider: document.getElementById('speedSlider'),
+            speedValue: document.getElementById('speedValue'),
+            customInput: document.getElementById('customInput'),
+            viewMode: document.getElementById('viewMode'),
+            layoutToggle: document.getElementById('layoutToggle'),
+            mainContent: document.getElementById('mainContent'),
+            generateBtn: document.getElementById('generateBtn'),
+            startBtn: document.getElementById('startBtn'),
+            pauseBtn: document.getElementById('pauseBtn'),
+            restoreBtn: document.getElementById('restoreBtn'),
+            logContent: document.getElementById('logContent'),
+            statusIndicator: document.getElementById('statusIndicator'),
+            statusText: document.getElementById('statusText'),
+            timerDisplay: document.getElementById('timerDisplay'),
+            moveCount: document.getElementById('moveCount'),
+        };
+
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initBuckets();
+            generateData();
+
+            // 视图切换监听
+            els.layoutToggle.addEventListener('click', toggleLayout);
+            els.viewMode.addEventListener('change', (e) => {
+                vizMode = e.target.value;
+                els.stage.className = `stage-container mb-12 mode-${vizMode}`; // 保持 mb-12
+                renderItems(true); // 强制重绘
+            });
+
+            // 输入监听
+            els.sizeSlider.addEventListener('input', (e) => {
+                els.sizeValue.textContent = e.target.value;
+                generateData();
+            });
+            els.speedSlider.addEventListener('input', updateSpeed);
+            
+            els.generateBtn.addEventListener('click', () => {
+                const custom = els.customInput.value.trim();
+                if (custom) {
+                    try {
+                        const parsed = custom.split(/[,， ]+/).map(Number).filter(n => !isNaN(n) && n >= 0 && n < 100);
+                        if (parsed.length < 2) throw new Error();
+                        rawData = parsed;
+                        originalData = [...rawData];
+                        renderItems(true);
+                        resetState();
+                    } catch {
+                        alert('请输入有效数字 (0-99)');
+                    }
+                } else {
+                    generateData();
+                }
+            });
+
+            // 控制按钮
+            els.startBtn.addEventListener('click', startSort);
+            els.pauseBtn.addEventListener('click', togglePause);
+            els.restoreBtn.addEventListener('click', () => {
+                state.stopFlag = true;
+                setTimeout(() => {
+                    rawData = [...originalData];
+                    renderItems(true);
+                    resetState();
+                    log('↩️ 数据已还原');
+                }, 100);
+            });
+
+            window.addEventListener('resize', () => {
+                if(!state.isSorting) renderItems(false);
+            });
+        });
+
+        // --- 功能函数 ---
+
+        function toggleLayout() {
+            const isDefault = els.mainContent.classList.contains('layout-default');
+            if (isDefault) {
+                els.mainContent.classList.remove('layout-default');
+                els.mainContent.classList.add('layout-sidebar');
+                els.layoutToggle.innerHTML = '<i class="fas fa-arrow-up text-blue-500"></i> 默认视图';
+            } else {
+                els.mainContent.classList.remove('layout-sidebar');
+                els.mainContent.classList.add('layout-default');
+                els.layoutToggle.innerHTML = '<i class="fas fa-columns text-blue-500"></i> 侧边视图';
+            }
+            setTimeout(() => renderItems(false), 300); // 重新计算位置
+        }
+
+        function updateSpeed() {
+            els.speedValue.textContent = els.speedSlider.value;
+            speedConfig = 2200 - (els.speedSlider.value * 200);
+        }
+
+        function initBuckets() {
+            els.bucketRow.innerHTML = '';
+            buckets = [];
+            for (let i = 0; i < bucketCount; i++) {
+                const b = document.createElement('div');
+                b.className = 'bucket';
+                const start = i * bucketSize;
+                const end = (i + 1) * bucketSize - 1;
+                b.innerHTML = `<div class="bucket-label">${start}-${end}</div>`;
+                els.bucketRow.appendChild(b);
+                buckets.push({ el: b, items: [] });
+            }
+        }
+
+        function generateData() {
+            const count = parseInt(els.sizeSlider.value);
+            rawData = [];
+            for (let i = 0; i < count; i++) {
+                rawData.push(Math.floor(Math.random() * 90) + 5); 
+            }
+            originalData = [...rawData];
+            renderItems(true);
+            resetState();
+        }
+
+        function renderItems(resetDOM) {
+            if (resetDOM) {
+                document.querySelectorAll('.array-item').forEach(el => el.remove());
+                domElements = [];
+            }
+
+            const sourceRect = els.sourceRow.getBoundingClientRect();
+            const stageRect = els.stage.getBoundingClientRect();
+            
+            // 计算尺寸
+            const containerW = sourceRect.width;
+            const count = rawData.length;
+            const gap = 8;
+            // 块模式固定宽度，柱状图模式自适应
+            let itemW = vizMode === 'block' ? 45 : Math.floor((containerW - (count-1)*gap) / count);
+            if (itemW > 50) itemW = 50;
+            
+            const totalW = count * itemW + (count - 1) * gap;
+            const startX = (sourceRect.width - totalW) / 2 + sourceRect.left - stageRect.left;
+            
+            // 基础底部位置 (相对于 Stage)
+            // sourceRow top:20, height:150. item bottom should align with sourceRow bottom.
+            const baseBottom = stageRect.height - (els.sourceRow.offsetTop + els.sourceRow.offsetHeight);
+
+            rawData.forEach((val, idx) => {
+                let el;
+                if (resetDOM) {
+                    el = document.createElement('div');
+                    el.className = 'array-item color-default';
+                    if (vizMode === 'block') el.textContent = val;
+                    els.stage.appendChild(el);
+                    domElements.push({ val, el, idx });
+                } else {
+                    el = domElements[idx].el;
+                }
+
+                // 样式重置
+                // 移除之前动画留下的 transition，防止重排时乱飞
+                el.style.transition = 'none'; 
+                el.style.transform = 'none';
+
+                el.style.width = `${itemW}px`;
+                el.style.left = `${startX + idx * (itemW + gap)}px`;
+                
+                if (vizMode === 'block') {
+                    el.style.height = `${itemW}px`; // 正方形
+                    el.style.top = `${els.sourceRow.offsetTop + 75}px`; // 垂直居中于区域
+                    el.textContent = val;
+                    el.style.alignItems = 'center';
+                } else {
+                    // Bar Mode
+                    const maxH = 140; 
+                    const h = (val / 100) * maxH;
+                    el.style.height = `${Math.max(20, h)}px`;
+                    // 底部对齐：Top = SourceRowBottom - Height
+                    const topPos = (els.sourceRow.offsetTop + els.sourceRow.offsetHeight) - Math.max(20, h);
+                    el.style.top = `${topPos}px`;
+                    
+                    // 柱子如果太窄，不显示文字
+                    if (itemW > 24) {
+                        el.innerHTML = `<span class="mb-1 text-xs opacity-90">${val}</span>`;
+                    } else {
+                        el.innerHTML = '';
+                    }
+                }
+                
+                // 强制重绘后恢复 transition
+                setTimeout(() => {
+                    el.style.transition = '';
+                }, 50);
+            });
+        }
+
+        function resetState() {
+            state.isSorting = false;
+            state.isPaused = false;
+            state.stopFlag = false;
+            state.moves = 0;
+            clearInterval(state.timerInterval);
+            
+            updateStatus('准备就绪', 'idle');
+            els.timerDisplay.textContent = '0.0s';
+            els.moveCount.textContent = '0';
+            els.startBtn.disabled = false;
+            els.startBtn.innerHTML = '<i class="fas fa-play"></i> 开始排序';
+            els.pauseBtn.disabled = true;
+            els.pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+            
+            highlightCode(-1);
+            buckets.forEach(b => b.items = []);
+            domElements.forEach(obj => {
+                obj.el.className = 'array-item color-default';
+                obj.el.style.transform = 'none';
+            });
+            els.logContent.innerHTML = '<div class="text-slate-500 flex items-start gap-2"><span class="text-blue-400 font-bold">></span><span>系统重置就绪</span></div>';
+        }
+
+        function updateStatus(text, type) {
+            els.statusText.textContent = text;
+            els.statusIndicator.className = `status-dot dot-${type}`;
+        }
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.className = 'log-entry text-slate-600 flex items-start gap-2 border-l-2 border-blue-100 pl-2 py-1';
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            div.innerHTML = `<span class="text-xs text-blue-400 font-mono mt-0.5">[${time}]</span> <span class="flex-1">${msg}</span>`;
+            els.logContent.appendChild(div);
+            els.logContent.scrollTop = els.logContent.scrollHeight;
+        }
+
+        function highlightCode(lineIndex) {
+            document.querySelectorAll('.code-line').forEach(el => el.classList.remove('code-active'));
+            if (lineIndex >= 0) {
+                document.getElementById(`line-${lineIndex}`).classList.add('code-active');
+            }
+        }
+
+        // --- 排序逻辑 ---
+
+        async function wait(factor = 1) {
+            if (state.stopFlag) throw new Error('ABORT');
+            return new Promise((resolve, reject) => {
+                const check = () => {
+                    if (state.stopFlag) reject(new Error('ABORT'));
+                    else if (!state.isPaused) resolve();
+                    else setTimeout(check, 100);
+                };
+                setTimeout(check, speedConfig * factor);
+            });
+        }
+
+        function animateMove(element, x, y) {
+            // 位置设置，动画由 CSS transition 处理
+            element.style.left = `${x}px`;
+            element.style.top = `${y}px`;
+        }
+
+        async function startSort() {
+            if (state.isSorting) return;
+            state.isSorting = true;
+            state.stopFlag = false;
+            updateStatus('排序中', 'running');
+            els.startBtn.disabled = true;
+            els.pauseBtn.disabled = false;
+            els.restoreBtn.disabled = true;
+            
+            state.startTime = Date.now();
+            state.timerInterval = setInterval(() => {
+                if(!state.isPaused) {
+                    els.timerDisplay.textContent = ((Date.now() - state.startTime)/1000).toFixed(1) + 's';
+                } else {
+                    state.startTime = Date.now() - (parseFloat(els.timerDisplay.textContent) * 1000);
+                }
+            }, 100);
+
+            try {
+                log('🚀 桶排序开始');
+                highlightCode(0);
+                await bucketSortAlgorithm();
+                
+                updateStatus('已完成', 'running');
+                log('🏆 排序完成！');
+                highlightCode(-1);
+                els.startBtn.innerHTML = '<i class="fas fa-check"></i> 完成';
+                els.pauseBtn.disabled = true;
+                els.restoreBtn.disabled = false;
+                
+            } catch (e) {
+                if (e.message !== 'ABORT') console.error(e);
+            } finally {
+                clearInterval(state.timerInterval);
+                state.isSorting = false;
+            }
+        }
+
+        async function bucketSortAlgorithm() {
+            const stageRect = els.stage.getBoundingClientRect();
+            
+            // 1. 分发入桶
+            highlightCode(1);
+            for (let i = 0; i < domElements.length; i++) {
+                const item = domElements[i];
+                highlightCode(2);
+                
+                const bIdx = Math.min(Math.floor(item.val / bucketSize), bucketCount - 1);
+                log(`🔹 元素 ${item.val} -> 放入桶 ${bIdx} (${bIdx*20}-${(bIdx+1)*20-1})`);
+                
+                // 动态计算本次移动的持续时间，保证速度滑块有效
+                const moveDuration = (speedConfig / 1000) * 0.6; // 0.6 是为了比等待时间稍长，制造重叠感
+                
+                // 设置丝滑过渡效果
+                item.el.style.transition = `all ${moveDuration}s cubic-bezier(0.22, 1, 0.36, 1)`;
+                item.el.classList.add('color-moving');
+                
+                // 极短等待，仅做代码高亮提示
+                await wait(0.1); 
+
+                highlightCode(3);
+                const bucketObj = buckets[bIdx];
+                const bucketRect = bucketObj.el.getBoundingClientRect();
+                const itemsInBucket = bucketObj.items.length;
+                
+                const itemW = parseFloat(item.el.style.width);
+                const targetLeft = (bucketRect.left - stageRect.left) + (bucketRect.width / 2) - (itemW / 2);
+                
+                let stackHeight = 0;
+                if (vizMode === 'block') {
+                    const h = parseFloat(item.el.style.height);
+                    stackHeight = (itemsInBucket + 1) * (h + 4);
+                } else {
+                    stackHeight = (itemsInBucket + 1) * 30; 
+                }
+
+                const bucketBottomY = bucketRect.bottom - stageRect.top;
+                const targetTop = bucketBottomY - stackHeight - 2; 
+
+                // 执行移动
+                animateMove(item.el, targetLeft, targetTop);
+                state.moves++;
+                els.moveCount.textContent = state.moves;
+
+                bucketObj.items.push(item);
+
+                // 关键优化：不等待完全落下就开始下一个循环，制造连续感
+                // 等待时间为 0.5 倍速，小于动画时长 0.6+，形成微重叠
+                await wait(0.5); 
+                
+                // 落下后状态更新 (此时视觉上可能还在微调位置，但不影响)
+                item.el.classList.remove('color-moving');
+                item.el.classList.add('color-in-bucket');
+            }
+
+            // 2. 桶内排序
+            highlightCode(4);
+            log('🔄 开始桶内排序...');
+            await wait(0.5); // 稍微停顿让所有元素落稳
+
+            for (let b = 0; b < buckets.length; b++) {
+                const bObj = buckets[b];
+                if (bObj.items.length > 1) {
+                    highlightCode(5);
+                    log(`🔨 排序第 ${b} 号桶...`);
+                    
+                    bObj.items.sort((a, b) => a.val - b.val);
+                    
+                    // 批量更新位置，使用统一的 transition
+                    const bRect = bObj.el.getBoundingClientRect();
+                    bObj.items.forEach((item, k) => {
+                        let stackHeight;
+                        if (vizMode === 'block') {
+                            const h = parseFloat(item.el.style.height);
+                            stackHeight = (k + 1) * (h + 4);
+                        } else {
+                            stackHeight = (k + 1) * 30;
+                        }
+                        const bucketBottomY = bRect.bottom - stageRect.top;
+                        const targetTop = bucketBottomY - stackHeight - 2;
+                        
+                        item.el.style.transition = 'all 0.5s ease-out';
+                        item.el.style.top = `${targetTop}px`;
+                        // 排序时给个微小的震动反馈
+                        item.el.style.transform = 'scale(1.05)';
+                        setTimeout(() => item.el.style.transform = 'scale(1)', 300);
+                    });
+                    
+                    await wait(0.8);
+                }
+            }
+
+            // 3. 回填（合并）
+            highlightCode(6);
+            log('📤 合并所有桶数据到主序列...');
+            
+            const sourceRect = els.sourceRow.getBoundingClientRect();
+            const count = rawData.length;
+            const gap = 8;
+            let itemW = parseFloat(domElements[0].el.style.width);
+            const totalW = count * itemW + (count - 1) * gap;
+            const startX = (sourceRect.width - totalW) / 2 + sourceRect.left - stageRect.left;
+
+            let globalIdx = 0;
+            
+            // 同样优化回填过程的连续性
+            for (let b = 0; b < buckets.length; b++) {
+                const bObj = buckets[b];
+                for (let k = 0; k < bObj.items.length; k++) {
+                    const item = bObj.items[k];
+                    
+                    item.el.classList.remove('color-in-bucket');
+                    item.el.classList.add('color-moving');
+                    
+                    const targetLeft = startX + globalIdx * (itemW + gap);
+                    let targetTop;
+                    if (vizMode === 'block') {
+                        targetTop = els.sourceRow.offsetTop + 75;
+                    } else {
+                        const h = parseFloat(item.el.style.height);
+                        targetTop = (els.sourceRow.offsetTop + els.sourceRow.offsetHeight) - h;
+                    }
+
+                    // 设置回填的动效参数
+                    const moveDuration = (speedConfig / 1000) * 0.6;
+                    item.el.style.transition = `all ${moveDuration}s cubic-bezier(0.22, 1, 0.36, 1)`;
+
+                    animateMove(item.el, targetLeft, targetTop);
+                    
+                    state.moves++;
+                    els.moveCount.textContent = state.moves;
+                    globalIdx++;
+                    
+                    // 连续出桶，不等完全归位就出下一个
+                    await wait(0.35); 
+                    
+                    item.el.classList.remove('color-moving');
+                    item.el.classList.add('color-sorted');
+                }
+            }
+        }
+
+        function togglePause() {
+            state.isPaused = !state.isPaused;
+            if (state.isPaused) {
+                els.pauseBtn.innerHTML = '<i class="fas fa-play"></i> 继续';
+                updateStatus('已暂停', 'paused');
+                log('⏸️ 演示暂停');
+            } else {
+                els.pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+                updateStatus('排序中', 'running');
+                log('▶️ 演示继续');
+            }
+        }
+
+    </script>
+</body>
+</html>

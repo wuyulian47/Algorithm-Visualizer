@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>基数排序可视化 | Radix Sort Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --bg-gradient: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg-gradient);
+            color: #334155;
+            min-height: 100vh;
+        }
+
+        /* 玻璃拟态效果 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+
+        /* 舞台容器 - 高度增加以容纳底部标签 */
+        .stage-container {
+            position: relative;
+            height: 420px; /* Modified: 增加高度防止遮挡 */
+            width: 100%;
+            background: rgba(248, 250, 252, 0.5);
+            border-radius: 1rem;
+            border: 1px dashed #cbd5e1;
+            overflow: hidden; /* 保持圆角 */
+        }
+
+        /* 排序元素 (方块) */
+        .radix-item {
+            position: absolute;
+            background: #60a5fa; /* Blue 400 */
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 20;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* 数字位样式 */
+        .digit-container { display: flex; gap: 1px; justify-content: center; }
+        .d-unit { opacity: 0.6; transition: all 0.3s; display: inline-block; }
+        .d-active { 
+            opacity: 1; 
+            color: #fbbf24; /* Amber 400 */
+            font-weight: 900;
+            transform: scale(1.3);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* 桶区域 - 向上移动 */
+        .bucket-container {
+            position: absolute;
+            bottom: 35px; /* Modified: 向上提，给下面的字留空间 */
+            width: 100%;
+            height: 140px;
+            display: flex;
+            justify-content: space-evenly;
+            padding: 0 10px;
+        }
+
+        .bucket {
+            width: 8.5%;
+            height: 100%;
+            border: 2px dashed #e2e8f0;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.4);
+            position: relative;
+            transition: background 0.3s;
+        }
+        .bucket.active-target {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: #3b82f6;
+        }
+
+        .bucket-label {
+            position: absolute;
+            bottom: -28px; /* 文字位置 */
+            width: 100%;
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: #64748b; /* 加深颜色增加对比度 */
+        }
+
+        /* 代码高亮区 */
+        .code-block {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            background: #1e293b;
+            color: #94a3b8;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            line-height: 1.6;
+        }
+        .code-line {
+            padding: 0 4px;
+            border-radius: 2px;
+            transition: all 0.2s;
+            display: block;
+        }
+        .code-active {
+            background: rgba(59, 130, 246, 0.3);
+            color: #ffffff;
+            border-left: 2px solid #3b82f6;
+            margin-left: -2px;
+        }
+
+        /* 终端日志样式 */
+        .log-container {
+            font-family: 'JetBrains Mono', monospace;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #8b5cf6; /* Purple highlight for Radix */
+        }
+        .log-entry { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: 0; } }
+
+        /* 布局逻辑 */
+        .layout-default .main-grid { display: flex; flex-direction: column; gap: 1.5rem; }
+        .layout-sidebar .main-grid { display: grid; grid-template-columns: 1fr 350px; gap: 1.5rem; }
+        @media (max-width: 1024px) { .layout-sidebar .main-grid { grid-template-columns: 1fr; } }
+
+        /* 状态指示灯 */
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .dot-running { background: #10b981; animation: pulse 1.5s infinite; }
+        .dot-paused { background: #f59e0b; }
+        .dot-idle { background: #94a3b8; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <div class="flex items-center gap-3 mb-1">
+                    <div class="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl text-white shadow-lg shadow-purple-200">
+                        <i class="fas fa-layer-group fa-lg"></i>
+                    </div>
+                    <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">基数排序 </h1>
+                </div>
+                <p class="text-slate-500 font-medium">Radix Sort Visualization Hub</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="layoutToggle" class="glass-card px-5 py-2.5 rounded-xl text-slate-700 font-semibold hover:bg-white transition flex items-center gap-2">
+                    <i class="fas fa-columns text-purple-500"></i> 视图切换
+                </button>
+            </div>
+        </header>
+
+        <div id="mainContent" class="layout-default">
+            
+            <!-- Control Panel -->
+            <section class="glass-card rounded-2xl p-6 mb-6">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-end">
+                    <!-- Size Control -->
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">数据数量</label>
+                            <span id="sizeValue" class="text-purple-600 font-bold font-mono text-sm">8</span>
+                        </div>
+                        <input type="range" id="sizeSlider" min="4" max="15" value="8" class="w-full accent-purple-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                    </div>
+                    
+                    <!-- Speed Control -->
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">动画速度</label>
+                            <span id="speedValue" class="text-purple-600 font-bold font-mono text-sm">中速</span>
+                        </div>
+                        <input type="range" id="speedSlider" min="200" max="1800" value="1000" step="50" class="w-full accent-purple-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                    </div>
+
+                    <!-- Custom Input -->
+                    <div class="lg:col-span-2">
+                        <label class="text-xs font-bold text-slate-500 uppercase block mb-2">自定义数据 (0-999)</label>
+                        <input type="text" id="customInput" placeholder="例如: 105, 23, 8, 442" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition shadow-sm font-mono">
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button id="generateBtn" class="bg-purple-50 text-purple-600 h-10 px-4 rounded-xl font-bold hover:bg-purple-100 transition border border-purple-100 flex items-center justify-center gap-2">
+                        <i class="fas fa-random"></i> 随机生成
+                    </button>
+                </div>
+            </section>
+
+            <div class="main-grid">
+                <!-- Left/Top Section: Visualization -->
+                <div class="space-y-6">
+                    <section class="glass-card rounded-3xl p-6 relative flex flex-col">
+                        <!-- Status Bar -->
+                        <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100 flex-wrap gap-4">
+                            <div class="flex items-center gap-4">
+                                <span class="flex items-center text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-1.5 rounded-full shadow-sm">
+                                    <span id="statusIndicator" class="status-dot dot-idle"></span>
+                                    <span id="statusText">准备就绪</span>
+                                </span>
+                            </div>
+                            <!-- Metrics -->
+                            <div class="flex items-center gap-3">
+                                <div class="text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
+                                    <i class="fas fa-stopwatch text-blue-400"></i>
+                                    <span class="text-slate-500 font-semibold">耗时:</span>
+                                    <span id="timerDisplay" class="font-mono font-bold text-slate-700">0.0s</span>
+                                </div>
+                                <div class="text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
+                                    <i class="fas fa-box-open text-green-400"></i>
+                                    <span class="text-slate-500 font-semibold">移动:</span>
+                                    <span id="moveCount" class="font-mono font-bold text-slate-700">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visualization Container -->
+                        <div id="stage" class="stage-container mb-8">
+                            <!-- Items and Buckets will be injected here via JS -->
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="flex flex-wrap justify-center gap-3">
+                            <button id="startBtn" class="px-6 py-2.5 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition shadow-lg shadow-purple-200 active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-play"></i> 开始演示
+                            </button>
+                            <button id="pauseBtn" disabled class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                                <i class="fas fa-pause"></i> 暂停
+                            </button>
+                            <button id="restoreBtn" class="px-6 py-2.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-undo"></i> 还原
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Terminal Log -->
+                    <section class="log-container rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                            <div class="flex items-center gap-2 text-slate-700 text-xs font-bold uppercase tracking-widest">
+                                <i class="fas fa-terminal text-purple-500"></i> 执行日志
+                            </div>
+                        </div>
+                        <div id="logContent" class="h-32 overflow-y-auto space-y-1.5 text-sm scrollbar-hide px-1">
+                            <div class="text-slate-500 flex items-start gap-2">
+                                <span class="text-purple-400 font-bold">></span> 
+                                <span>等待系统指令...</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right/Bottom Section: Algorithm Info & Code -->
+                <aside id="infoSection" class="glass-card rounded-2xl p-6 border-t-4 border-purple-500 h-full flex flex-col gap-6">
+                    
+                    <!-- Code Trace -->
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-code text-blue-500"></i> 逻辑追踪
+                        </h3>
+                        <div class="code-block shadow-inner" id="codeBox">
+                            <span class="code-line" id="code-0">for digit in [个位, 十位, 百位]:</span>
+                            <span class="code-line" id="code-1">  buckets = create_buckets(10)</span>
+                            <span class="code-line" id="code-2">  // 分发阶段</span>
+                            <span class="code-line" id="code-3">  for num in array:</span>
+                            <span class="code-line" id="code-4">    d = get_digit(num, digit)</span>
+                            <span class="code-line" id="code-5">    buckets[d].push(num)</span>
+                            <span class="code-line" id="code-6">  // 收集阶段</span>
+                            <span class="code-line" id="code-7">  array = flatten(buckets)</span>
+                        </div>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-3">图例说明</h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs font-medium text-slate-600">
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-blue-400 opacity-60"></div>未处理位</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-yellow-400"></div>当前位高亮</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded border border-dashed border-slate-400"></div>分桶容器</div>
+                        </div>
+                    </div>
+
+                    <!-- Algorithm Details -->
+                    <div class="text-slate-600 text-sm">
+                        <h4 class="font-bold text-slate-800 mb-2">💡 核心思想</h4>
+                        <p class="leading-relaxed mb-4">基数排序是一种非比较型整数排序算法。原理是将整数按位数切割成不同的数字，然后按每个位数分别比较（通常从低位到高位）。</p>
+                        
+                        <div class="flex flex-wrap gap-2 mb-2">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold">时间: O(k*n)</span>
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">空间: O(n+k)</span>
+                            <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">稳定</span>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-slate-400 text-xs pb-4">
+            <p>Radix Sort Pro Visualization</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- 全局变量 ---
+        let rawData = [], domElements = [], originalData = [];
+        let state = {
+            isSorting: false,
+            isPaused: false,
+            abortSignal: false,
+            moves: 0,
+            startTime: 0,
+            timerInterval: null
+        };
+        
+        let itemW = 60, startL = 0, gap = 15;
+        let speed = 1000;
+
+        // --- DOM 引用 ---
+        const els = {
+            sizeSlider: document.getElementById('sizeSlider'),
+            sizeValue: document.getElementById('sizeValue'),
+            speedSlider: document.getElementById('speedSlider'),
+            speedValue: document.getElementById('speedValue'),
+            customInput: document.getElementById('customInput'),
+            generateBtn: document.getElementById('generateBtn'),
+            startBtn: document.getElementById('startBtn'),
+            pauseBtn: document.getElementById('pauseBtn'),
+            restoreBtn: document.getElementById('restoreBtn'),
+            stage: document.getElementById('stage'),
+            logContent: document.getElementById('logContent'),
+            statusIndicator: document.getElementById('statusIndicator'),
+            statusText: document.getElementById('statusText'),
+            timerDisplay: document.getElementById('timerDisplay'),
+            moveCount: document.getElementById('moveCount'),
+            layoutToggle: document.getElementById('layoutToggle'),
+            mainContent: document.getElementById('mainContent')
+        };
+
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            init('random');
+            
+            // 布局切换
+            els.layoutToggle.addEventListener('click', toggleLayout);
+
+            // 输入监听
+            els.sizeSlider.addEventListener('input', (e) => {
+                els.sizeValue.textContent = e.target.value;
+                init('random');
+            });
+            els.speedSlider.addEventListener('input', (e) => {
+                speed = 2000 - e.target.value; // 反转：滑块越大(1800) -> 间隔越小(200)
+                let label = "中速";
+                if(e.target.value > 1400) label = "极速";
+                else if(e.target.value < 600) label = "慢速";
+                els.speedValue.textContent = label;
+            });
+            els.generateBtn.addEventListener('click', () => init('random'));
+            
+            els.customInput.addEventListener('change', () => init('custom'));
+            
+            // 控制按钮
+            els.startBtn.addEventListener('click', startSortProcess);
+            els.pauseBtn.addEventListener('click', togglePause);
+            els.restoreBtn.addEventListener('click', () => init('restore'));
+
+            window.addEventListener('resize', render);
+        });
+
+        function toggleLayout() {
+            const isDefault = els.mainContent.classList.contains('layout-default');
+            if (isDefault) {
+                els.mainContent.classList.remove('layout-default');
+                els.mainContent.classList.add('layout-sidebar');
+                els.layoutToggle.innerHTML = '<i class="fas fa-arrow-up text-purple-500"></i> 默认视图';
+            } else {
+                els.mainContent.classList.remove('layout-sidebar');
+                els.mainContent.classList.add('layout-default');
+                els.layoutToggle.innerHTML = '<i class="fas fa-columns text-purple-500"></i> 侧边视图';
+            }
+            setTimeout(render, 300);
+        }
+
+        async function init(type) {
+            if (state.isSorting) {
+                state.abortSignal = true;
+                // 等待一下让动画循环退出
+                await new Promise(r => setTimeout(r, 150));
+            }
+
+            resetState();
+
+            if (type === 'custom') {
+                const val = els.customInput.value;
+                const parsed = val.split(/[,， ]+/).map(n => parseInt(n.trim())).filter(n => !isNaN(n) && n < 1000);
+                if (parsed.length < 2) { 
+                    alert("请输入至少2个有效数字(0-999)"); 
+                    return; 
+                }
+                rawData = parsed;
+                originalData = [...rawData];
+                log('📝 已加载自定义数据');
+            } else if (type === 'restore') {
+                rawData = [...originalData];
+                log('↩️ 数据已还原');
+            } else {
+                const count = parseInt(els.sizeSlider.value);
+                rawData = Array.from({length: count}, () => Math.floor(Math.random() * 900) + 10);
+                originalData = [...rawData];
+                log('🎲 生成新的随机数据');
+            }
+            render();
+        }
+
+        function resetState() {
+            clearInterval(state.timerInterval);
+            state = {
+                isSorting: false,
+                isPaused: false,
+                abortSignal: false,
+                moves: 0,
+                startTime: 0,
+                timerInterval: null
+            };
+            
+            updateStatus('准备就绪', 'idle');
+            els.timerDisplay.textContent = '0.0s';
+            els.moveCount.textContent = '0';
+            els.logContent.innerHTML = '<div class="text-slate-500 flex items-start gap-2"><span class="text-purple-400 font-bold">></span><span>系统准备就绪</span></div>';
+            
+            els.startBtn.disabled = false;
+            els.startBtn.innerHTML = '<i class="fas fa-play"></i> 开始演示';
+            els.pauseBtn.disabled = true;
+            els.pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+            
+            highlightLine(-1);
+        }
+
+        function render() {
+            els.stage.innerHTML = '';
+            domElements = [];
+            
+            const n = rawData.length;
+            const stageW = els.stage.clientWidth;
+            
+            // 计算方块宽度
+            const totalGap = (n + 1) * gap;
+            itemW = Math.min(80, Math.floor((stageW - totalGap) / n));
+            // 重新计算起始位置使其居中
+            const totalContentW = n * itemW + (n - 1) * gap;
+            startL = (stageW - totalContentW) / 2;
+
+            // 生成方块
+            rawData.forEach((val, i) => {
+                const el = document.createElement('div');
+                el.className = 'radix-item';
+                el.style.width = el.style.height = `${itemW}px`;
+                el.style.left = `${startL + i * (itemW + gap)}px`;
+                el.style.bottom = '65%';
+                el.style.transform = 'translateY(50%)'; // 垂直居中修正
+                
+                const s = val.toString().padStart(3, '0');
+                // 字体大小自适应
+                const fontSize = Math.max(12, itemW * 0.35);
+                el.innerHTML = `<div class="digit-container" style="font-size:${fontSize}px">
+                    <span class="d-unit d2">${s[0]}</span>
+                    <span class="d-unit d1">${s[1]}</span>
+                    <span class="d-unit d0">${s[2]}</span>
+                </div>`;
+                els.stage.appendChild(el);
+                domElements.push(el);
+            });
+
+            // 生成桶
+            const bucketContainer = document.createElement('div');
+            bucketContainer.className = 'bucket-container';
+            for(let i=0; i<10; i++) {
+                const b = document.createElement('div');
+                b.className = 'bucket';
+                b.id = `bucket-${i}`;
+                b.innerHTML = `<div class="bucket-label">桶 ${i}</div>`;
+                bucketContainer.appendChild(b);
+            }
+            els.stage.appendChild(bucketContainer);
+        }
+
+        function highlightLine(lineId) {
+            document.querySelectorAll('.code-line').forEach(el => el.classList.remove('code-active'));
+            if (lineId >= 0) {
+                const line = document.getElementById(`code-${lineId}`);
+                if (line) line.classList.add('code-active');
+            }
+        }
+
+        function highlightDigits(digitIdx) {
+            domElements.forEach(el => {
+                el.querySelectorAll('.d-unit').forEach(u => u.classList.remove('d-active'));
+                if(digitIdx !== -1) {
+                    const target = el.querySelector(`.d${digitIdx}`);
+                    if(target) target.classList.add('d-active');
+                }
+            });
+        }
+
+        function updateStatus(text, type) {
+            els.statusText.textContent = text;
+            els.statusIndicator.className = `status-dot dot-${type}`;
+        }
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.className = 'log-entry text-slate-600 flex items-start gap-2 border-l-2 border-purple-100 pl-2 py-1';
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            div.innerHTML = `<span class="text-xs text-purple-400 font-mono mt-0.5">[${time}]</span> <span class="flex-1">${msg}</span>`;
+            els.logContent.appendChild(div);
+            els.logContent.scrollTop = els.logContent.scrollHeight;
+        }
+
+        // --- 核心算法逻辑 ---
+
+        async function wait(factor = 1) {
+            if (state.abortSignal) throw "ABORT";
+            return new Promise((resolve, reject) => {
+                const check = () => { 
+                    if (state.abortSignal) reject("ABORT");
+                    else if(!state.isPaused) resolve(); 
+                    else setTimeout(check, 100); 
+                };
+                setTimeout(check, (2000 - els.speedSlider.value) * factor);
+            });
+        }
+
+        async function startSortProcess() {
+            state.isSorting = true;
+            state.abortSignal = false;
+            
+            els.startBtn.disabled = true;
+            els.pauseBtn.disabled = false;
+            updateStatus('排序进行中', 'running');
+            log('🚀 基数排序开始');
+            
+            state.startTime = Date.now();
+            state.timerInterval = setInterval(() => {
+                if(!state.isPaused && !state.abortSignal) {
+                    els.timerDisplay.textContent = ((Date.now() - state.startTime)/1000).toFixed(1) + 's';
+                } else {
+                    state.startTime = Date.now() - (parseFloat(els.timerDisplay.textContent) * 1000);
+                }
+            }, 100);
+
+            try {
+                await radixSort();
+                completeSort();
+            } catch (e) {
+                if (e !== "ABORT") console.error(e);
+                log('⛔ 排序已终止');
+            }
+        }
+
+        async function radixSort() {
+            // 获取桶的DOM引用，用于计算坐标
+            const bucketDOMs = [];
+            for(let i=0; i<10; i++) bucketDOMs.push(document.getElementById(`bucket-${i}`));
+            
+            highlightLine(0);
+            for (let d = 0; d < 3; d++) {
+                const posName = ["个位", "十位", "百位"][d];
+                log(`🔄 正在处理第 ${d+1} 轮：${posName}`);
+                highlightDigits(d);
+                highlightLine(1);
+                await wait(1.2);
+
+                let buckets = Array.from({length: 10}, () => []);
+
+                // 1. 分桶阶段
+                highlightLine(3);
+                for (let i = 0; i < rawData.length; i++) {
+                    highlightLine(4);
+                    const val = rawData[i];
+                    const digit = Math.floor(val / Math.pow(10, d)) % 10;
+                    
+                    log(`📦 数字 ${val} 的${posName}是 ${digit} -> 放入桶 ${digit}`);
+                    
+                    const targetBucket = bucketDOMs[digit];
+                    targetBucket.classList.add('active-target'); // 高亮桶
+
+                    // 计算位置
+                    const rect = targetBucket.getBoundingClientRect();
+                    const stageRect = els.stage.getBoundingClientRect();
+                    
+                    const el = domElements[i];
+                    el.style.zIndex = 100 + i; // 保证移动时在最上层
+                    
+                    highlightLine(5);
+                    // 移动动画
+                    el.style.transition = `all ${(2000 - els.speedSlider.value)/1000}s ease`;
+                    el.style.left = (rect.left - stageRect.left + (rect.width - itemW)/2) + 'px';
+                    
+                    // Modified: 这里的 bottom 计算需要配合 .bucket-container 的 bottom 值 (35px)
+                    // 基础底部 40px，加上堆叠高度
+                    const stackHeight = 15; 
+                    el.style.bottom = (40 + buckets[digit].length * stackHeight) + 'px';
+                    el.style.transform = 'translateY(0)'; // 取消垂直居中偏移
+                    
+                    buckets[digit].push({val: val, el: el});
+                    state.moves++;
+                    els.moveCount.textContent = state.moves;
+                    
+                    await wait(0.8);
+                    targetBucket.classList.remove('active-target');
+                }
+
+                // 2. 收集阶段
+                highlightLine(7);
+                log(`📥 按桶顺序(0-9)收集元素`);
+                await wait(1);
+                
+                let idx = 0;
+                for (let b = 0; b < 10; b++) {
+                    if (buckets[b].length > 0) {
+                        for (let obj of buckets[b]) {
+                            rawData[idx] = obj.val;
+                            domElements[idx] = obj.el;
+                            
+                            // 移回原来的行
+                            domElements[idx].style.zIndex = 20;
+                            domElements[idx].style.bottom = '65%';
+                            domElements[idx].style.transform = 'translateY(50%)';
+                            domElements[idx].style.left = `${startL + idx * (itemW + gap)}px`;
+                            
+                            idx++;
+                            await wait(0.2); // 快速收集
+                        }
+                    }
+                }
+                await wait(1);
+            }
+        }
+
+        function completeSort() {
+            state.isSorting = false;
+            clearInterval(state.timerInterval);
+            updateStatus('已完成', 'running');
+            highlightLine(-1);
+            highlightDigits(-1);
+            
+            // 庆祝动画
+            domElements.forEach((el, i) => {
+                setTimeout(() => {
+                    el.style.backgroundColor = '#10b981'; // Green 500
+                    el.style.transform = 'translateY(30%) scale(1.1)';
+                    setTimeout(() => {
+                        el.style.transform = 'translateY(50%) scale(1)';
+                    }, 200);
+                }, i * 50);
+            });
+
+            els.startBtn.disabled = false;
+            els.startBtn.innerHTML = '<i class="fas fa-redo"></i> 重新开始';
+            els.pauseBtn.disabled = true;
+            log('🏆 排序全部完成！');
+        }
+
+        function togglePause() {
+            if (!state.isSorting) return;
+            state.isPaused = !state.isPaused;
+            
+            if (state.isPaused) {
+                els.pauseBtn.innerHTML = '<i class="fas fa-play"></i> 继续';
+                updateStatus('已暂停', 'paused');
+                log('⏸️ 流程暂停');
+            } else {
+                els.pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+                updateStatus('排序进行中', 'running');
+                log('▶️ 流程继续');
+            }
+        }
+    </script>
+</body>
+</html>

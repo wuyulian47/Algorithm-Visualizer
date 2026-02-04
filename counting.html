@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>计数排序可视化 | Counting Sort Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --bg-gradient: linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 100%);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg-gradient);
+            color: #334155;
+            min-height: 100vh;
+        }
+
+        /* 玻璃拟态卡片 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+
+        /* 舞台容器 */
+        .stage-container {
+            position: relative;
+            height: 380px; /* 比冒泡排序稍高，因为需要放桶 */
+            width: 100%;
+            background: #f8fafc;
+            border-radius: 1rem;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+
+        /* 计数桶区域 */
+        .buckets-track {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 140px;
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            border-bottom: 2px dashed #cbd5e1;
+            padding-bottom: 0;
+        }
+
+        .bucket-slot {
+            flex: 1;
+            height: 100%;
+            margin: 0 4px;
+            border: 1px dashed rgba(203, 213, 225, 0.6);
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            position: relative;
+            background: rgba(241, 245, 249, 0.5);
+            transition: background 0.3s;
+        }
+        
+        .bucket-slot.active-bucket {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: #60a5fa;
+        }
+
+        .bucket-label {
+            position: absolute;
+            bottom: -25px;
+            width: 100%;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748b;
+        }
+
+        .bucket-count-badge {
+            position: absolute;
+            top: -25px;
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 800;
+            color: #3b82f6;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .bucket-count-badge.visible { opacity: 1; transform: translateY(-5px); }
+
+        /* 元素样式 */
+        .array-item {
+            position: absolute;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 8px;
+            background-color: #60a5fa; /* Blue 400 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* 状态颜色 */
+        .color-moving { 
+            background-color: #f59e0b !important; /* Amber */
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+            z-index: 50;
+        }
+        .color-sorted { background-color: #10b981 !important; } /* Emerald */
+        .color-phantom { opacity: 0.3; filter: grayscale(1); }
+
+        /* 代码高亮区 */
+        .code-block {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            background: #1e293b;
+            color: #94a3b8;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            line-height: 1.6;
+        }
+        .code-line {
+            padding: 0 4px;
+            border-radius: 2px;
+            transition: all 0.2s;
+            display: block;
+        }
+        .code-active {
+            background: rgba(59, 130, 246, 0.3);
+            color: #ffffff;
+            border-left: 2px solid #3b82f6;
+            margin-left: -2px;
+        }
+
+        /* 日志区域 */
+        .log-container {
+            font-family: 'JetBrains Mono', monospace;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #3b82f6;
+        }
+        .log-entry { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: 0; } }
+
+        /* 布局控制 */
+        .layout-default .main-grid { display: flex; flex-direction: column; gap: 1.5rem; }
+        .layout-sidebar .main-grid { display: grid; grid-template-columns: 1fr 350px; gap: 1.5rem; }
+        @media (max-width: 1024px) { .layout-sidebar .main-grid { grid-template-columns: 1fr; } }
+
+        /* 指示灯 */
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .dot-running { background: #10b981; animation: pulse 1.5s infinite; }
+        .dot-paused { background: #f59e0b; }
+        .dot-idle { background: #94a3b8; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <div class="flex items-center gap-3 mb-1">
+                    <div class="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl text-white shadow-lg shadow-blue-200">
+                        <i class="fas fa-layer-group fa-lg"></i>
+                    </div>
+                    <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">计数排序</h1>
+                </div>
+                <p class="text-slate-500 font-medium">Counting Sort Visualization Hub</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="layoutToggle" class="glass-card px-5 py-2.5 rounded-xl text-slate-700 font-semibold hover:bg-white transition flex items-center gap-2">
+                    <i class="fas fa-columns text-blue-500"></i> 视图切换
+                </button>
+            </div>
+        </header>
+
+        <div id="mainContent" class="layout-default">
+            
+            <!-- Control Panel -->
+            <section class="glass-card rounded-2xl p-6 mb-6">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-end">
+                    <!-- Visualization Mode -->
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase block mb-2">视图模式</label>
+                        <select id="viewMode" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-sm font-medium text-slate-700">
+                            <option value="block">🧊 标准方块</option>
+                            <option value="bar">📊 高度柱状</option>
+                        </select>
+                    </div>
+
+                    <!-- Size Control -->
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">数据规模</label>
+                            <span id="sizeValue" class="text-blue-600 font-bold font-mono text-sm">10</span>
+                        </div>
+                        <input type="range" id="sizeSlider" min="5" max="20" value="10" class="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                    </div>
+                    
+                    <!-- Speed Control -->
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">动画速度</label>
+                            <span id="speedValue" class="text-blue-600 font-bold font-mono text-sm">5</span>
+                        </div>
+                        <input type="range" id="speedSlider" min="1" max="10" value="5" class="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                    </div>
+
+                    <!-- Custom Input -->
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase block mb-2">自定义数据 (0-9)</label>
+                        <input type="text" id="customArray" placeholder="例如: 3, 1, 4, 1" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-sm font-mono">
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button id="generateBtn" class="bg-blue-50 text-blue-600 h-10 px-4 rounded-xl font-bold hover:bg-blue-100 transition border border-blue-100 flex items-center justify-center gap-2">
+                        <i class="fas fa-sync-alt"></i> 生成数组
+                    </button>
+                </div>
+            </section>
+
+            <div class="main-grid">
+                <!-- Left/Top Section: Visualization -->
+                <div class="space-y-6">
+                    <section class="glass-card rounded-3xl p-6 relative flex flex-col">
+                        <!-- Status Bar -->
+                        <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100 flex-wrap gap-4">
+                            <div class="flex items-center gap-4">
+                                <span class="flex items-center text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-1.5 rounded-full shadow-sm">
+                                    <span id="statusIndicator" class="status-dot dot-idle"></span>
+                                    <span id="statusText">准备就绪</span>
+                                </span>
+                            </div>
+                            <!-- Metrics -->
+                            <div class="flex items-center gap-3">
+                                <div class="text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
+                                    <i class="fas fa-stopwatch text-blue-400"></i>
+                                    <span class="text-slate-500 font-semibold">耗时:</span>
+                                    <span id="timerDisplay" class="font-mono font-bold text-slate-700">0.0s</span>
+                                </div>
+                                <div class="text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
+                                    <i class="fas fa-exchange-alt text-green-400"></i>
+                                    <span class="text-slate-500 font-semibold">移动:</span>
+                                    <span id="moveCount" class="font-mono font-bold text-slate-700">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visualization Container -->
+                        <div id="stage" class="stage-container mb-8">
+                            <!-- JS will inject items and buckets here -->
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="flex flex-wrap justify-center gap-3">
+                            <button id="startBtn" class="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-play"></i> 开始排序
+                            </button>
+                            <button id="pauseBtn" disabled class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                                <i class="fas fa-pause"></i> 暂停
+                            </button>
+                            <button id="resetBtn" class="px-6 py-2.5 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl font-bold hover:bg-rose-100 transition active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-undo"></i> 重置
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Terminal Log -->
+                    <section class="log-container rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                            <div class="flex items-center gap-2 text-slate-700 text-xs font-bold uppercase tracking-widest">
+                                <i class="fas fa-terminal text-blue-500"></i> 执行日志
+                            </div>
+                        </div>
+                        <div id="logContent" class="h-32 overflow-y-auto space-y-1.5 text-sm scrollbar-hide px-1">
+                            <div class="text-slate-500 flex items-start gap-2">
+                                <span class="text-blue-400 font-bold">></span> 
+                                <span>等待系统指令...</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right/Bottom Section: Algorithm Info & Code -->
+                <aside id="infoSection" class="glass-card rounded-2xl p-6 border-t-4 border-purple-500 h-full flex flex-col gap-6">
+                    
+                    <!-- Code Trace -->
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-code text-purple-500"></i> 核心代码逻辑
+                        </h3>
+                        <div class="code-block shadow-inner" id="codeBox">
+                            <span class="code-line" id="line-0">find max_val in Array A</span>
+                            <span class="code-line" id="line-1">count = Array(max_val + 1).fill(0)</span>
+                            <span class="code-line" id="line-2">for num in A:</span>
+                            <span class="code-line" id="line-3">  count[num]++ // 放入对应桶中</span>
+                            <span class="code-line" id="line-4">A = [] // 清空原数组</span>
+                            <span class="code-line" id="line-5">for i from 0 to max_val:</span>
+                            <span class="code-line" id="line-6">  while count[i] > 0:</span>
+                            <span class="code-line" id="line-7">    A.push(i), count[i]-- // 回填</span>
+                        </div>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-3">图例说明</h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs font-medium text-slate-600">
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-amber-500"></div>正在移动/统计</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-emerald-500"></div>已回填排序</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-blue-400"></div>无序元素</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded border border-dashed border-slate-400"></div>计数桶</div>
+                        </div>
+                    </div>
+
+                    <!-- Algorithm Details -->
+                    <div class="text-slate-600 text-sm">
+                        <h4 class="font-bold text-slate-800 mb-2">💡 核心思想</h4>
+                        <p class="leading-relaxed mb-4">不通过比较，而是利用数组索引来记录每个数字出现的次数，然后按顺序还原。适用于范围较小的整数排序。</p>
+                        
+                        <div class="flex flex-wrap gap-2 mb-2">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold">时间: O(n+k)</span>
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">空间: O(k)</span>
+                            <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">稳定</span>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+        
+        <footer class="mt-8 text-center text-slate-400 text-xs pb-4">
+            <p>Counting Sort Pro Visualization</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- State Management ---
+        let state = {
+            array: [],
+            doms: [],
+            buckets: [], // bucket DOMs
+            counts: [], // numeric counts
+            bucketDoms: [], // 2D array of element DOMs in buckets
+            isSorting: false,
+            isPaused: false,
+            abort: false,
+            moves: 0,
+            startTime: 0,
+            timerInterval: null,
+            maxVal: 9 // Limit for visualization sake
+        };
+
+        // Configuration
+        let config = {
+            speed: 500,
+            vizMode: 'block', // 'block' or 'bar'
+            maxValueLimit: 9 // To fit on screen nicely
+        };
+
+        // DOM Elements
+        const els = {
+            stage: document.getElementById('stage'),
+            sizeSlider: document.getElementById('sizeSlider'),
+            sizeValue: document.getElementById('sizeValue'),
+            speedSlider: document.getElementById('speedSlider'),
+            speedValue: document.getElementById('speedValue'),
+            customArray: document.getElementById('customArray'),
+            viewMode: document.getElementById('viewMode'),
+            generateBtn: document.getElementById('generateBtn'),
+            startBtn: document.getElementById('startBtn'),
+            pauseBtn: document.getElementById('pauseBtn'),
+            resetBtn: document.getElementById('resetBtn'),
+            logContent: document.getElementById('logContent'),
+            statusText: document.getElementById('statusText'),
+            statusIndicator: document.getElementById('statusIndicator'),
+            timerDisplay: document.getElementById('timerDisplay'),
+            moveCount: document.getElementById('moveCount'),
+            layoutToggle: document.getElementById('layoutToggle'),
+            mainContent: document.getElementById('mainContent')
+        };
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initEvents();
+            generateNewArray();
+        });
+
+        function initEvents() {
+            // Layout Toggle
+            els.layoutToggle.addEventListener('click', toggleLayout);
+
+            // Inputs
+            els.sizeSlider.addEventListener('input', () => {
+                els.sizeValue.textContent = els.sizeSlider.value;
+                generateNewArray();
+            });
+            els.speedSlider.addEventListener('input', updateSpeed);
+            
+            els.viewMode.addEventListener('change', (e) => {
+                config.vizMode = e.target.value;
+                renderArray(true); // Re-render in place
+            });
+
+            els.generateBtn.addEventListener('click', () => {
+                const custom = els.customArray.value.trim();
+                if (custom) parseCustomInput(custom);
+                else generateNewArray();
+            });
+
+            // Controls
+            els.startBtn.addEventListener('click', startSort);
+            els.pauseBtn.addEventListener('click', togglePause);
+            els.resetBtn.addEventListener('click', reset);
+            
+            // Resize
+            window.addEventListener('resize', () => {
+                if(!state.isSorting) renderArray();
+            });
+        }
+
+        // --- Core Functions ---
+
+        function toggleLayout() {
+            const isDefault = els.mainContent.classList.contains('layout-default');
+            els.mainContent.classList.toggle('layout-default');
+            els.mainContent.classList.toggle('layout-sidebar');
+            els.layoutToggle.innerHTML = isDefault 
+                ? '<i class="fas fa-arrow-up text-blue-500"></i> 默认视图' 
+                : '<i class="fas fa-columns text-blue-500"></i> 侧边视图';
+            setTimeout(() => { if(!state.isSorting) renderArray(); }, 300);
+        }
+
+        function updateSpeed() {
+            els.speedValue.textContent = els.speedSlider.value;
+            // 1 = Slow (1000ms), 10 = Fast (100ms)
+            config.speed = 1000 - (els.speedSlider.value - 1) * 100;
+            if (config.speed < 50) config.speed = 50;
+        }
+
+        function generateNewArray() {
+            resetState();
+            const size = parseInt(els.sizeSlider.value);
+            state.array = Array.from({length: size}, () => Math.floor(Math.random() * (config.maxValueLimit + 1)));
+            state.maxVal = Math.max(...state.array, config.maxValueLimit); // ensure at least limit
+            renderArray();
+            log(`🎲 生成随机数组，大小: ${size}`);
+        }
+
+        function parseCustomInput(str) {
+            try {
+                const arr = str.split(/[,，\s]+/).map(n => parseInt(n)).filter(n => !isNaN(n) && n >= 0);
+                if (arr.length === 0) throw new Error("Empty");
+                if (Math.max(...arr) > 15) { alert("为了可视化效果，请使用 0-15 之间的数字"); return; }
+                
+                resetState();
+                state.array = arr;
+                // Update size slider visually only
+                els.sizeValue.textContent = arr.length;
+                els.sizeSlider.value = Math.min(arr.length, 20);
+                state.maxVal = Math.max(...state.array, config.maxValueLimit);
+                renderArray();
+                log("📝 加载自定义数据");
+            } catch (e) {
+                alert("请输入有效的数字，例如: 3, 1, 4");
+            }
+        }
+
+        function resetState() {
+            stopTimer();
+            state.isSorting = false;
+            state.isPaused = false;
+            state.abort = true; // Signal current runs to stop
+            setTimeout(() => state.abort = false, 100);
+            
+            state.moves = 0;
+            els.moveCount.textContent = '0';
+            els.timerDisplay.textContent = '0.0s';
+            updateStatus('准备就绪', 'idle');
+            
+            els.startBtn.disabled = false;
+            els.startBtn.innerHTML = '<i class="fas fa-play"></i> 开始排序';
+            els.pauseBtn.disabled = true;
+            els.pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+            
+            highlightCode(-1);
+        }
+
+        function reset() {
+            resetState();
+            // Deep copy original if needed, but here we just regenerate/re-render
+            setTimeout(renderArray, 150);
+            log("🔄 重置系统");
+        }
+
+        // --- Rendering ---
+
+        function renderArray(maintainPos = false) {
+            els.stage.innerHTML = '';
+            state.doms = [];
+            state.bucketDoms = Array.from({length: state.maxVal + 1}, () => []);
+            state.counts = new Array(state.maxVal + 1).fill(0);
+
+            // 1. Create Buckets Track
+            const track = document.createElement('div');
+            track.className = 'buckets-track';
+            state.buckets = [];
+            
+            for(let i=0; i<=state.maxVal; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'bucket-slot';
+                slot.id = `bucket-${i}`;
+                slot.innerHTML = `
+                    <div class="bucket-count-badge" id="badge-${i}">0</div>
+                    <div class="bucket-label">${i}</div>
+                `;
+                track.appendChild(slot);
+                state.buckets.push(slot);
+            }
+            els.stage.appendChild(track);
+
+            // 2. Calculate Layout
+            const stageRect = els.stage.getBoundingClientRect(); // Use rect for relative calcs
+            const w = els.stage.clientWidth;
+            const itemW = Math.min(50, Math.floor((w - 40) / state.array.length) - 8);
+            const startX = (w - (state.array.length * (itemW + 8))) / 2;
+            const startY = 40; // Top margin
+
+            // 3. Create Items
+            state.array.forEach((val, idx) => {
+                const el = document.createElement('div');
+                el.className = 'array-item';
+                el.textContent = val;
+                
+                // Style
+                el.style.width = `${itemW}px`;
+                el.style.left = `${startX + idx * (itemW + 8)}px`;
+                el.style.top = `${startY}px`;
+                
+                if (config.vizMode === 'block') {
+                    el.style.height = `${itemW}px`;
+                } else {
+                    // Bar mode: height relative to max
+                    const h = 30 + (val / state.maxVal) * 50;
+                    el.style.height = `${h}px`;
+                    el.style.alignItems = 'flex-end';
+                    el.style.paddingBottom = '5px';
+                }
+
+                els.stage.appendChild(el);
+                state.doms.push(el);
+            });
+        }
+
+        // --- Sorting Logic ---
+
+        async function wait() {
+            if (state.abort) throw new Error('ABORT');
+            return new Promise(resolve => {
+                const check = () => {
+                    if (state.abort) return; // Promise hangs, outer logic handles abort flag
+                    if (!state.isPaused) resolve();
+                    else setTimeout(check, 100);
+                };
+                setTimeout(check, config.speed);
+            });
+        }
+
+        async function startSort() {
+            if (state.isSorting) return;
+            state.isSorting = true;
+            state.abort = false;
+            
+            updateStatus('排序中', 'running');
+            els.startBtn.disabled = true;
+            els.pauseBtn.disabled = false;
+            els.customArray.disabled = true;
+            els.sizeSlider.disabled = true;
+
+            startTimer();
+            log("🚀 计数排序开始");
+
+            try {
+                await countingSort();
+                finishSort();
+            } catch (e) {
+                if(e.message !== 'ABORT') console.error(e);
+            }
+        }
+
+        async function countingSort() {
+            // Step 1: Count
+            highlightCode(0); highlightCode(1);
+            
+            for (let i = 0; i < state.array.length; i++) {
+                const val = state.array[i];
+                const el = state.doms[i];
+                
+                log(`🔍 扫描元素 [${val}]`);
+                highlightCode(2);
+                
+                // Highlight
+                el.classList.add('color-moving');
+                state.buckets[val].classList.add('active-bucket');
+                
+                // Move to bucket
+                const bucketRect = state.buckets[val].getBoundingClientRect();
+                const stageRect = els.stage.getBoundingClientRect();
+                
+                // Calculate position in bucket (stacking)
+                const offsetInBucket = state.bucketDoms[val].length;
+                
+                // Animation Position
+                const targetLeft = (bucketRect.left - stageRect.left) + (bucketRect.width - parseFloat(el.style.width))/2;
+                const targetTop = (bucketRect.top - stageRect.top) + bucketRect.height - (offsetInBucket + 1) * (parseFloat(el.style.height) + 5) - 10;
+
+                el.style.left = `${targetLeft}px`;
+                el.style.top = `${targetTop}px`;
+                
+                await wait();
+
+                // Logic Update
+                state.counts[val]++;
+                state.bucketDoms[val].push(el);
+                state.moves++;
+                els.moveCount.textContent = state.moves;
+
+                // Update Badge
+                highlightCode(3);
+                const badge = document.getElementById(`badge-${val}`);
+                badge.textContent = state.counts[val];
+                badge.classList.add('visible');
+                
+                el.classList.remove('color-moving');
+                state.buckets[val].classList.remove('active-bucket');
+                
+                await wait();
+            }
+
+            // Step 2: Reconstruct
+            highlightCode(4); highlightCode(5);
+            log("✅ 统计完成，开始回填");
+            
+            let sortedIdx = 0;
+            // Original Positions recalculation for row layout
+            const w = els.stage.clientWidth;
+            const itemW = parseFloat(state.doms[0].style.width);
+            const startX = (w - (state.array.length * (itemW + 8))) / 2;
+
+            for (let i = 0; i <= state.maxVal; i++) {
+                if(state.bucketDoms[i].length > 0) {
+                    highlightCode(6);
+                    log(`📤 从桶 [${i}] 取出元素`);
+                }
+                
+                while (state.bucketDoms[i].length > 0) {
+                    const el = state.bucketDoms[i].shift(); // Take bottom-most logically (FIFO for stability)
+                    // Actually visually it's a stack, but Counting Sort is stable.
+                    // Let's grab the one that was put in first? 
+                    // To be stable, we should iterate original array backwards or just use FIFO list here.
+                    // state.bucketDoms was pushed in order, shifting gives stability.
+
+                    el.classList.add('color-moving');
+                    highlightCode(7);
+
+                    // Move to sorted position
+                    el.style.left = `${startX + sortedIdx * (itemW + 8)}px`;
+                    el.style.top = `40px`; // Back to top row
+                    
+                    state.moves++;
+                    els.moveCount.textContent = state.moves;
+                    
+                    // Update Count Badge
+                    state.counts[i]--;
+                    const badge = document.getElementById(`badge-${i}`);
+                    badge.textContent = state.counts[i];
+                    if(state.counts[i] === 0) badge.classList.remove('visible');
+
+                    await wait();
+                    
+                    el.classList.remove('color-moving');
+                    el.classList.add('color-sorted');
+                    sortedIdx++;
+                }
+            }
+        }
+
+        function finishSort() {
+            stopTimer();
+            state.isSorting = false;
+            updateStatus('已完成', 'running');
+            els.startBtn.disabled = false;
+            els.startBtn.innerHTML = '<i class="fas fa-redo"></i> 重新开始';
+            els.pauseBtn.disabled = true;
+            els.customArray.disabled = false;
+            els.sizeSlider.disabled = false;
+            highlightCode(-1);
+            log("🏆 排序完成！");
+            
+            // Celebration
+            state.doms.forEach((d, i) => {
+                setTimeout(() => {
+                    d.style.transform = "scale(1.1)";
+                    setTimeout(() => d.style.transform = "scale(1)", 200);
+                }, i * 50);
+            });
+        }
+
+        // --- Helpers ---
+
+        function togglePause() {
+            if (!state.isSorting) return;
+            state.isPaused = !state.isPaused;
+            if (state.isPaused) {
+                updateStatus('已暂停', 'paused');
+                els.pauseBtn.innerHTML = '<i class="fas fa-play"></i> 继续';
+                stopTimer();
+                log("⏸️ 流程暂停");
+            } else {
+                updateStatus('排序中', 'running');
+                els.pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+                startTimer();
+                log("▶️ 流程继续");
+            }
+        }
+
+        function startTimer() {
+            if(!state.startTime) state.startTime = Date.now();
+            // Adjust start time if resuming
+            else state.startTime = Date.now() - (parseFloat(els.timerDisplay.textContent) * 1000);
+            
+            state.timerInterval = setInterval(() => {
+                const diff = (Date.now() - state.startTime) / 1000;
+                els.timerDisplay.textContent = diff.toFixed(1) + 's';
+            }, 100);
+        }
+
+        function stopTimer() {
+            clearInterval(state.timerInterval);
+        }
+
+        function updateStatus(text, type) {
+            els.statusText.textContent = text;
+            els.statusIndicator.className = `status-dot dot-${type}`;
+        }
+
+        function highlightCode(idx) {
+            document.querySelectorAll('.code-line').forEach(l => l.classList.remove('code-active'));
+            if (idx >= 0) {
+                const line = document.getElementById(`line-${idx}`);
+                if (line) line.classList.add('code-active');
+            }
+        }
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.className = 'log-entry text-slate-600 flex items-start gap-2 border-l-2 border-blue-100 pl-2 py-1';
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            div.innerHTML = `<span class="text-xs text-blue-400 font-mono mt-0.5">[${time}]</span> <span class="flex-1">${msg}</span>`;
+            els.logContent.appendChild(div);
+            els.logContent.scrollTop = els.logContent.scrollHeight;
+        }
+    </script>
+</body>
+</html>
