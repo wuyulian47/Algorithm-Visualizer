@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>插入排序可视化 | Insertion Sort Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #3b82f6;
+            --secondary: #8b5cf6;
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg-gradient);
+            color: #334155;
+            min-height: 100vh;
+        }
+
+        /* 玻璃拟态效果 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+
+        /* 舞台容器 */
+        .visualization-container {
+            position: relative;
+            height: 340px; /* 增加高度以容纳“提起”动画 */
+            width: 100%;
+            overflow: visible;
+        }
+
+        .array-container {
+            position: relative;
+            height: 100%;
+            width: 100%;
+            display: flex;
+            align-items: flex-end;
+        }
+
+        /* 数组元素通用样式 */
+        .array-item {
+            position: absolute;
+            transition: height 0.3s ease, background-color 0.3s ease, left 0.4s cubic-bezier(0.25, 1, 0.5, 1), transform 0.4s ease, box-shadow 0.3s;
+            border-radius: 6px 6px 2px 2px;
+            background-color: #60a5fa; /* Blue 400 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+
+        /* 柱状模式 */
+        .mode-bar .array-item {
+            bottom: 0;
+            align-items: flex-end;
+            padding-bottom: 4px;
+            transform-origin: bottom center;
+        }
+
+        /* 色块模式 */
+        .mode-block .array-item {
+            bottom: 40%; /* 稍微靠下，留出上方提起空间 */
+            transform: translateY(50%);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+        }
+
+        /* --- 状态颜色与动画 --- */
+        
+        /* 默认状态 */
+        .color-default { background-color: #60a5fa; } 
+
+        /* 正在比较 */
+        .color-comparing { 
+            background-color: #f59e0b !important; /* Amber 500 */
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+            z-index: 20;
+        }
+
+        /* 已排序区域 */
+        .color-sorted { background-color: #10b981 !important; opacity: 0.9; } /* Emerald 500 */
+
+        /* 被选中的 Key (提起状态) */
+        .color-picked {
+            background-color: #8b5cf6 !important; /* Purple 500 */
+            z-index: 50 !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            border: 2px solid white;
+        }
+
+        /* 柱状图模式下的提起动画 */
+        .mode-bar .color-picked {
+            transform: translateY(-110%) scale(1.05) !important; /* 向上浮动 */
+        }
+
+        /* 色块模式下的提起动画 */
+        .mode-block .color-picked {
+            transform: translateY(-80%) scale(1.1) !important; /* 向上浮动 */
+        }
+
+        /* 指针指示器 */
+        .pointer-container {
+            position: absolute;
+            bottom: -35px;
+            width: 100%;
+            height: 30px;
+            pointer-events: none;
+        }
+        
+        .mode-block ~ .pointer-container { bottom: 10%; }
+
+        .pointer {
+            position: absolute;
+            transition: left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 20;
+            bottom: 0;
+        }
+
+        .pointer-tag {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2px;
+        }
+
+        .pointer-arrow {
+            width: 0; height: 0; 
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-bottom: 6px solid;
+        }
+
+        .pointer-i .pointer-tag { background-color: #8b5cf6; }
+        .pointer-i .pointer-arrow { border-bottom-color: #8b5cf6; }
+        
+        .pointer-j .pointer-tag { background-color: #f59e0b; }
+        .pointer-j .pointer-arrow { border-bottom-color: #f59e0b; }
+
+        /* 代码高亮区 */
+        .code-block {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            background: #1e293b;
+            color: #94a3b8;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            line-height: 1.6;
+        }
+        .code-line {
+            padding: 0 4px;
+            border-radius: 2px;
+            transition: all 0.2s;
+            display: block;
+        }
+        .code-active {
+            background: rgba(59, 130, 246, 0.3);
+            color: #ffffff;
+            border-left: 2px solid #3b82f6;
+            margin-left: -2px;
+        }
+
+        /* 终端日志 */
+        .log-container {
+            font-family: 'JetBrains Mono', monospace;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #3b82f6;
+        }
+        .log-entry { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: 0; } }
+
+        /* 布局逻辑 */
+        .layout-default .main-grid { display: flex; flex-direction: column; gap: 1.5rem; }
+        .layout-sidebar .main-grid { display: grid; grid-template-columns: 1fr 350px; gap: 1.5rem; }
+        @media (max-width: 1024px) { .layout-sidebar .main-grid { grid-template-columns: 1fr; } }
+
+        /* 状态指示灯 */
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .dot-running { background: #10b981; animation: pulse 1.5s infinite; }
+        .dot-paused { background: #f59e0b; }
+        .dot-idle { background: #94a3b8; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <div class="flex items-center gap-3 mb-1">
+                    <div class="p-2 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl text-white shadow-lg shadow-purple-200">
+                        <i class="fas fa-layer-group fa-lg"></i>
+                    </div>
+                    <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">插入排序 </h1>
+                </div>
+                <p class="text-slate-500 font-medium">Insertion Sort Visualization Hub</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="layoutToggle" class="glass-card px-5 py-2.5 rounded-xl text-slate-700 font-semibold hover:bg-white transition flex items-center gap-2">
+                    <i class="fas fa-columns text-blue-500"></i> 视图切换
+                </button>
+            </div>
+        </header>
+
+        <div id="mainContent" class="layout-default">
+            
+            <!-- Control Panel -->
+            <section class="glass-card rounded-2xl p-6 mb-6">
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-end">
+                    <!-- Visualization Mode -->
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase block mb-2">视图模式</label>
+                        <select id="viewMode" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-sm font-medium text-slate-700">
+                            <option value="bar">📊 高度柱状图</option>
+                            <option value="block">🧊 等高色块图</option>
+                        </select>
+                    </div>
+
+                    <!-- Size Control -->
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">数据规模</label>
+                            <span id="sizeValue" class="text-blue-600 font-bold font-mono text-sm">12</span>
+                        </div>
+                        <input type="range" id="sizeSlider" min="5" max="20" value="12" class="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                    </div>
+                    
+                    <!-- Speed Control -->
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">动画速度</label>
+                            <span id="speedValue" class="text-blue-600 font-bold font-mono text-sm">5</span>
+                        </div>
+                        <input type="range" id="speedSlider" min="1" max="10" value="5" class="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                    </div>
+
+                    <!-- Custom Input -->
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase block mb-2">自定义数据</label>
+                        <input type="text" id="customArray" placeholder="例如: 45, 12, 8" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition shadow-sm font-mono">
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button id="generateBtn" class="bg-blue-50 text-blue-600 h-10 px-4 rounded-xl font-bold hover:bg-blue-100 transition border border-blue-100 flex items-center justify-center gap-2">
+                        <i class="fas fa-sync-alt"></i> 生成数组
+                    </button>
+                </div>
+            </section>
+
+            <div class="main-grid">
+                <!-- Left/Top Section: Visualization -->
+                <div class="space-y-6">
+                    <section class="glass-card rounded-3xl p-6 relative flex flex-col">
+                        <!-- Status Bar -->
+                        <div class="flex justify-between items-center mb-8 pb-4 border-b border-slate-100 flex-wrap gap-4">
+                            <div class="flex items-center gap-4">
+                                <span class="flex items-center text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-1.5 rounded-full shadow-sm">
+                                    <span id="statusIndicator" class="status-dot dot-idle"></span>
+                                    <span id="statusText">准备就绪</span>
+                                </span>
+                            </div>
+                            <!-- Metrics -->
+                            <div class="flex items-center gap-3">
+                                <div class="text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
+                                    <i class="fas fa-stopwatch text-blue-400"></i>
+                                    <span class="text-slate-500 font-semibold">耗时:</span>
+                                    <span id="timerDisplay" class="font-mono font-bold text-slate-700">0.0s</span>
+                                </div>
+                                <div class="text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 flex items-center gap-2">
+                                    <i class="fas fa-exchange-alt text-amber-500"></i>
+                                    <span class="text-slate-500 font-semibold">比较:</span>
+                                    <span id="compCount" class="font-mono font-bold text-slate-700">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visualization Container -->
+                        <div class="visualization-container mb-8">
+                            <div id="sortArray" class="array-container mode-bar">
+                                <!-- Bars/Blocks will be injected here -->
+                            </div>
+                            <!-- Pointers -->
+                            <div id="pointerContainer" class="pointer-container">
+                                <div id="pointerI" class="pointer pointer-i" style="display:none;">
+                                    <div class="pointer-arrow"></div>
+                                    <div class="pointer-tag">i (待插)</div>
+                                </div>
+                                <div id="pointerJ" class="pointer pointer-j" style="display:none;">
+                                    <div class="pointer-arrow"></div>
+                                    <div class="pointer-tag">j (比较)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="flex flex-wrap justify-center gap-3">
+                            <button id="startBtn" class="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-play"></i> 开始排序
+                            </button>
+                            <button id="pauseBtn" disabled class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                                <i class="fas fa-pause"></i> 暂停
+                            </button>
+                            <!-- 修改：单步按钮初始不再禁用 -->
+                            <button id="stepBtn" class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition disabled:opacity-50 active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-step-forward"></i> 单步
+                            </button>
+                            <button id="resetBtn" class="px-6 py-2.5 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl font-bold hover:bg-rose-100 transition active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-undo"></i> 重置
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Terminal Log -->
+                    <section class="log-container rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                            <div class="flex items-center gap-2 text-slate-700 text-xs font-bold uppercase tracking-widest">
+                                <i class="fas fa-terminal text-blue-500"></i> 执行日志
+                            </div>
+                        </div>
+                        <div id="logContent" class="h-32 overflow-y-auto space-y-1.5 text-sm scrollbar-hide px-1">
+                            <div class="text-slate-500 flex items-start gap-2">
+                                <span class="text-blue-400 font-bold">></span> 
+                                <span>等待系统指令...</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right/Bottom Section: Algorithm Info & Code -->
+                <aside id="infoSection" class="glass-card rounded-2xl p-6 border-t-4 border-purple-500 h-full flex flex-col gap-6">
+                    
+                    <!-- Code Trace -->
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-code text-purple-500"></i> 代码跟踪
+                        </h3>
+                        <div class="code-block shadow-inner" id="codeBox">
+                            <span class="code-line" id="line-0">procedure insertionSort(A):</span>
+                            <span class="code-line" id="line-1">  for i from 1 to n-1:</span>
+                            <span class="code-line" id="line-2">    key = A[i]</span>
+                            <span class="code-line" id="line-3">    j = i - 1</span>
+                            <span class="code-line" id="line-4">    while j >= 0 and A[j] > key:</span>
+                            <span class="code-line" id="line-5">      A[j + 1] = A[j]</span>
+                            <span class="code-line" id="line-6">      j = j - 1</span>
+                            <span class="code-line" id="line-7">    A[j + 1] = key</span>
+                        </div>
+                    </div>
+
+                    <!-- Legend -->
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-3">图例说明</h4>
+                        <div class="grid grid-cols-2 gap-2 text-xs font-medium text-slate-600">
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-purple-500 border border-white shadow"></div>提取 (Key)</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-amber-500"></div>正在比较</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-emerald-500"></div>已排序区</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-blue-400"></div>未排序区</div>
+                        </div>
+                    </div>
+
+                    <!-- Algorithm Details -->
+                    <div class="text-slate-600 text-sm">
+                        <h4 class="font-bold text-slate-800 mb-2">💡 核心思想</h4>
+                        <p class="leading-relaxed mb-4">像打扑克牌整理手牌一样。将未排序的元素一个个取出，插入到已排序序列的正确位置。</p>
+                        
+                        <div class="flex flex-wrap gap-2 mb-2">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-bold">时间: O(n²)</span>
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">空间: O(1)</span>
+                            <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">稳定</span>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-slate-400 text-xs pb-4">
+            <p>Insertion Sort Pro Visualization</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- 全局变量与状态 ---
+        let array = []; // 数值数组
+        let doms = []; // DOM 元素数组 (与 index 对应)
+        let originalArray = [];
+        let state = {
+            isSorting: false,
+            isPaused: false,
+            stepMode: false,
+            stepResolver: null,
+            stopFlag: false,
+            comparisons: 0,
+            startTime: 0,
+            timerInterval: null
+        };
+        
+        let speed = 500;
+        let vizMode = 'bar'; // 'bar' or 'block'
+
+        // --- DOM 引用 ---
+        const els = {
+            sizeSlider: document.getElementById('sizeSlider'),
+            sizeValue: document.getElementById('sizeValue'),
+            speedSlider: document.getElementById('speedSlider'),
+            speedValue: document.getElementById('speedValue'),
+            customArray: document.getElementById('customArray'),
+            viewMode: document.getElementById('viewMode'),
+            generateBtn: document.getElementById('generateBtn'),
+            startBtn: document.getElementById('startBtn'),
+            pauseBtn: document.getElementById('pauseBtn'),
+            stepBtn: document.getElementById('stepBtn'),
+            resetBtn: document.getElementById('resetBtn'),
+            sortArray: document.getElementById('sortArray'),
+            logContent: document.getElementById('logContent'),
+            statusIndicator: document.getElementById('statusIndicator'),
+            statusText: document.getElementById('statusText'),
+            timerDisplay: document.getElementById('timerDisplay'),
+            compCount: document.getElementById('compCount'),
+            pointerI: document.getElementById('pointerI'),
+            pointerJ: document.getElementById('pointerJ'),
+            layoutToggle: document.getElementById('layoutToggle'),
+            mainContent: document.getElementById('mainContent')
+        };
+
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateSizeValue();
+            updateSpeedValue();
+            generateNewArray();
+            
+            els.layoutToggle.addEventListener('click', toggleLayout);
+            els.sizeSlider.addEventListener('input', () => { updateSizeValue(); generateNewArray(); });
+            els.speedSlider.addEventListener('input', updateSpeedValue);
+            els.viewMode.addEventListener('change', (e) => {
+                vizMode = e.target.value;
+                els.sortArray.className = `array-container mode-${vizMode}`;
+                renderArray(); // 重新渲染以适应新模式
+                if(state.isSorting) {
+                    // 如果正在排序中切换模式，需要重置，因为 left/bottom 计算方式变了
+                    alert("请在重置状态下切换视图模式以获得最佳体验");
+                    state.stopFlag = true;
+                }
+            });
+            
+            els.generateBtn.addEventListener('click', parseCustomInput);
+            
+            els.startBtn.addEventListener('click', startSort);
+            els.pauseBtn.addEventListener('click', togglePause);
+            els.stepBtn.addEventListener('click', stepSort);
+            els.resetBtn.addEventListener('click', resetAll);
+
+            window.addEventListener('resize', () => { if (!state.isSorting && array.length > 0) renderArray(); });
+        });
+
+        // --- 核心功能函数 ---
+
+        function toggleLayout() {
+            const isDefault = els.mainContent.classList.contains('layout-default');
+            if (isDefault) {
+                els.mainContent.classList.remove('layout-default');
+                els.mainContent.classList.add('layout-sidebar');
+                els.layoutToggle.innerHTML = '<i class="fas fa-arrow-up text-blue-500"></i> 默认视图';
+            } else {
+                els.mainContent.classList.remove('layout-sidebar');
+                els.mainContent.classList.add('layout-default');
+                els.layoutToggle.innerHTML = '<i class="fas fa-columns text-blue-500"></i> 侧边视图';
+            }
+            setTimeout(() => { if(!state.isSorting) renderArray(); }, 300);
+        }
+
+        function updateSizeValue() { els.sizeValue.textContent = els.sizeSlider.value; }
+        
+        function updateSpeedValue() {
+            els.speedValue.textContent = els.speedSlider.value;
+            // 速度 1-10 映射到 1500ms - 50ms
+            speed = 1500 - (els.speedSlider.value - 1) * 150;
+            if(speed < 50) speed = 50;
+        }
+
+        function parseCustomInput() {
+            const custom = els.customArray.value.trim();
+            if (custom) {
+                try {
+                    const parsed = custom.split(/[,， ]+/).map(Number).filter(n => !isNaN(n));
+                    if (parsed.length < 2) throw new Error();
+                    if (parsed.length > 20) { alert('数量过多，建议20以内'); return; }
+                    array = parsed;
+                    originalArray = [...array];
+                    resetState();
+                    renderArray();
+                } catch {
+                    alert('请输入有效的数字数组，例如: 45, 12, 8');
+                }
+            } else {
+                generateNewArray();
+            }
+        }
+
+        function generateNewArray() {
+            const size = parseInt(els.sizeSlider.value);
+            array = [];
+            for (let i = 0; i < size; i++) {
+                array.push(Math.floor(Math.random() * 85) + 10);
+            }
+            originalArray = [...array];
+            resetState();
+            renderArray();
+        }
+
+        function resetAll() {
+            state.stopFlag = true;
+            if (state.stepResolver) state.stepResolver();
+            setTimeout(() => {
+                array = [...originalArray];
+                resetState();
+                renderArray();
+            }, 100);
+        }
+
+        function resetState() {
+            state = { ...state, isSorting: false, isPaused: false, stepMode: false, stopFlag: false, comparisons: 0 };
+            clearInterval(state.timerInterval);
+            updateStatus('未开始', 'idle');
+            els.timerDisplay.textContent = '0.0s';
+            els.compCount.textContent = '0';
+            hidePointers();
+            els.logContent.innerHTML = '<div class="text-slate-500 flex items-start gap-2"><span class="text-blue-400 font-bold">></span><span>系统重置就绪</span></div>';
+            highlightCode(-1);
+            
+            els.startBtn.disabled = false;
+            els.startBtn.innerHTML = '<i class="fas fa-play"></i> 开始排序';
+            els.pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+            els.pauseBtn.disabled = true;
+            // 关键修改：重置状态下启用单步按钮
+            els.stepBtn.disabled = false; 
+        }
+
+        function updateStatus(text, type) {
+            els.statusText.textContent = text;
+            els.statusIndicator.className = `status-dot dot-${type}`;
+        }
+
+        // --- 渲染逻辑 (关键) ---
+        
+        // 计算每个 slot 的 left 位置，用于绝对定位
+        function getSlotPosition(index, total, containerWidth) {
+            const totalGap = (total + 1) * 6; // 6px gap
+            const availableWidth = containerWidth - totalGap;
+            const itemWidth = Math.max(16, Math.floor(availableWidth / total));
+            // 居中计算
+            const realTotalWidth = total * itemWidth + (total - 1) * 6;
+            const startX = (containerWidth - realTotalWidth) / 2;
+            
+            return {
+                left: startX + index * (itemWidth + 6),
+                width: itemWidth
+            };
+        }
+
+        function renderArray() {
+            els.sortArray.innerHTML = '';
+            doms = [];
+            
+            const maxValue = Math.max(...array, 100);
+            const containerWidth = els.sortArray.clientWidth;
+            
+            array.forEach((value, index) => {
+                const item = document.createElement('div');
+                item.className = 'array-item color-default';
+                
+                const pos = getSlotPosition(index, array.length, containerWidth);
+                item.style.left = `${pos.left}px`;
+                item.style.width = `${pos.width}px`;
+
+                // 内容与高度
+                if (vizMode === 'bar') {
+                    const heightPercent = (value / maxValue) * 70; // 留出顶部空间给 lift
+                    item.style.height = `${heightPercent}%`;
+                    if (pos.width > 24) {
+                        item.innerHTML = `<span class="mb-1 text-xs text-white font-bold opacity-90">${value}</span>`;
+                    }
+                } else {
+                    item.style.height = `${pos.width}px`; // 正方形
+                    item.innerHTML = `<span>${value}</span>`;
+                }
+                
+                // 标记初始状态，index 0 默认视为有序
+                // 但为了演示效果，刚开始全是蓝色，等算法跑第一步
+                
+                els.sortArray.appendChild(item);
+                doms.push(item);
+            });
+        }
+
+        function updatePointer(pointer, index) {
+            if (index < 0 || index >= doms.length) {
+                pointer.style.display = 'none';
+                return;
+            }
+            pointer.style.display = 'flex';
+            // 获取当前 index 对应的逻辑位置 (即使元素移动了，我们计算的是 slot 的位置)
+            const pos = getSlotPosition(index, array.length, els.sortArray.clientWidth);
+            const pWidth = 30; 
+            pointer.style.left = `${pos.left + pos.width/2 - pWidth/2}px`;
+        }
+
+        function hidePointers() {
+            els.pointerI.style.display = 'none';
+            els.pointerJ.style.display = 'none';
+        }
+
+        function highlightCode(lineIndex) {
+            document.querySelectorAll('.code-line').forEach(el => el.classList.remove('code-active'));
+            if (lineIndex >= 0) {
+                const line = document.getElementById(`line-${lineIndex}`);
+                if (line) line.classList.add('code-active');
+            }
+        }
+
+        // --- 排序算法逻辑 ---
+
+        async function wait(factor = 1) {
+            if (state.stopFlag) throw new Error('ABORT');
+            if (state.stepMode) {
+                return new Promise(resolve => { state.stepResolver = resolve; });
+            }
+            return new Promise(resolve => setTimeout(resolve, speed * factor));
+        }
+
+        async function startSort() {
+            if (state.isSorting) return;
+            state.isSorting = true;
+            state.stopFlag = false;
+            updateStatus('排序中', 'running');
+            els.startBtn.disabled = true;
+            els.pauseBtn.disabled = false;
+            els.stepBtn.disabled = false;
+            
+            state.startTime = Date.now();
+            state.timerInterval = setInterval(() => {
+                if(!state.isPaused && !state.stopFlag) {
+                    const diff = (Date.now() - state.startTime) / 1000;
+                    els.timerDisplay.textContent = diff.toFixed(1) + 's';
+                } else {
+                    state.startTime = Date.now() - (parseFloat(els.timerDisplay.textContent) * 1000);
+                }
+            }, 100);
+
+            try {
+                log('🚀 插入排序开始');
+                highlightCode(0);
+                await insertionSort();
+                completeSort();
+            } catch (e) {
+                if (e.message !== 'ABORT') console.error(e);
+                updateStatus('已停止', 'paused');
+            }
+        }
+
+        async function insertionSort() {
+            const n = array.length;
+            doms[0].classList.add('color-sorted'); // 第一个默认有序
+            
+            for (let i = 1; i < n; i++) {
+                if (state.stopFlag) throw new Error('ABORT');
+                highlightCode(1);
+                
+                let keyVal = array[i];
+                let keyEl = doms[i];
+                let j = i - 1;
+
+                updatePointer(els.pointerI, i);
+                
+                // 1. 提取 (Lift)
+                log(`📤 提取元素 [${i}]: ${keyVal}`);
+                highlightCode(2);
+                keyEl.classList.add('color-picked');
+                await wait(1.2);
+
+                highlightCode(3);
+                // 2. 扫描与移位
+                while (j >= 0) {
+                    if (state.stopFlag) throw new Error('ABORT');
+                    updatePointer(els.pointerJ, j);
+                    highlightCode(4);
+
+                    // 比较视觉效果
+                    doms[j].classList.add('color-comparing');
+                    log(`🔍 比较 ${array[j]} vs ${keyVal}`);
+                    state.comparisons++;
+                    els.compCount.textContent = state.comparisons;
+                    await wait(1);
+
+                    if (array[j] > keyVal) {
+                        log(`➡️ ${array[j]} > ${keyVal}，后移`);
+                        highlightCode(5);
+                        
+                        // 逻辑移位: array[j] 移到 j+1
+                        // 视觉移位: doms[j] 的 left 设为 j+1 的位置
+                        const nextSlot = getSlotPosition(j + 1, n, els.sortArray.clientWidth);
+                        doms[j].style.left = `${nextSlot.left}px`;
+                        
+                        // 更新数据结构引用
+                        array[j + 1] = array[j];
+                        doms[j + 1] = doms[j]; // DOM 引用也移动
+                        
+                        doms[j].classList.remove('color-comparing');
+                        
+                        // keyEl (视觉上) 跟着指针左移，为了好看，可选
+                        // const currentJSlot = getSlotPosition(j, n, els.sortArray.clientWidth);
+                        // keyEl.style.left = `${currentJSlot.left}px`;
+
+                        j = j - 1;
+                        highlightCode(6);
+                        await wait(0.8);
+                    } else {
+                        doms[j].classList.remove('color-comparing');
+                        log(`⏹️ ${array[j]} <= ${keyVal}，停止后移`);
+                        break;
+                    }
+                }
+
+                // 3. 插入 (Drop)
+                highlightCode(7);
+                log(`⬇️ 将 ${keyVal} 插入位置 ${j + 1}`);
+                
+                // 计算最终位置
+                const finalSlot = getSlotPosition(j + 1, n, els.sortArray.clientWidth);
+                keyEl.style.left = `${finalSlot.left}px`; // 移动到上方
+                
+                // 更新数据
+                array[j + 1] = keyVal;
+                doms[j + 1] = keyEl;
+
+                await wait(0.8);
+                
+                // 下落动画
+                keyEl.classList.remove('color-picked');
+                keyEl.classList.add('color-sorted');
+                
+                // 把 0到i 的都标记为 sorted
+                for(let k=0; k<=i; k++) doms[k].classList.add('color-sorted');
+
+                await wait(0.5);
+            }
+        }
+
+        function togglePause() {
+            if (!state.isSorting) return;
+            state.isPaused = !state.isPaused;
+            state.stepMode = state.isPaused;
+            
+            if (state.isPaused) {
+                els.pauseBtn.innerHTML = '<i class="fas fa-play"></i> 继续';
+                updateStatus('已暂停', 'paused');
+                log('⏸️ 流程暂停');
+            } else {
+                els.pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+                updateStatus('排序中', 'running');
+                log('▶️ 流程继续');
+                if (state.stepResolver) {
+                    state.stepResolver();
+                    state.stepResolver = null;
+                }
+            }
+        }
+
+        function stepSort() {
+            if (!state.isSorting) {
+                // 如果还未开始，点击单步则启动并进入暂停模式
+                startSort();
+                state.stepMode = true;
+                state.isPaused = true;
+                els.pauseBtn.innerHTML = '<i class="fas fa-play"></i> 继续';
+                updateStatus('单步模式', 'paused');
+            } else if (state.stepMode && state.stepResolver) {
+                // 如果已经在单步等待中，执行一步
+                state.stepResolver();
+                state.stepResolver = null;
+            } else if (!state.isPaused) {
+                // 如果正在自动播放，点击单步则暂停
+                togglePause();
+            }
+        }
+
+        function completeSort() {
+            state.isSorting = false;
+            clearInterval(state.timerInterval);
+            updateStatus('已完成', 'running');
+            hidePointers();
+            highlightCode(-1);
+            
+            // 庆祝动画
+            doms.forEach((item, idx) => {
+                setTimeout(() => {
+                    item.style.transform = vizMode === 'bar' ? 'scale(1.1)' : 'translateY(50%) scale(1.1)';
+                    item.style.zIndex = '100';
+                    setTimeout(() => {
+                        item.style.transform = vizMode === 'bar' ? 'scale(1)' : 'translateY(50%) scale(1)';
+                        item.style.zIndex = '';
+                    }, 200);
+                }, idx * 50);
+            });
+            
+            els.startBtn.disabled = false;
+            els.startBtn.innerHTML = '<i class="fas fa-redo"></i> 重新开始';
+            els.pauseBtn.disabled = true;
+            els.stepBtn.disabled = true; // 完成后禁用单步
+            log('🏆 排序完成！');
+        }
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.className = 'log-entry text-slate-600 flex items-start gap-2 border-l-2 border-purple-100 pl-2 py-1';
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            div.innerHTML = `<span class="text-xs text-blue-400 font-mono mt-0.5">[${time}]</span> <span class="flex-1">${msg}</span>`;
+            els.logContent.appendChild(div);
+            els.logContent.scrollTop = els.logContent.scrollHeight;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>选择排序可视化 | Selection Sort Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #4f46e5;
+            --secondary: #8b5cf6;
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg-gradient);
+            color: #334155;
+            min-height: 100vh;
+        }
+
+        /* 玻璃拟态效果 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+
+        /* 柱子容器 */
+        .array-container {
+            position: relative;
+            height: 280px;
+            width: 100%;
+        }
+
+        .array-bar {
+            position: absolute;
+            bottom: 0;
+            transition: height 0.3s ease, background-color 0.3s ease, left 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+            border-radius: 6px 6px 2px 2px;
+            background-color: #cbd5e1; /* Default Slate 300 */
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        /* 状态颜色系统 */
+        .color-default { background-color: #60a5fa; } /* Blue 400 */
+        
+        .color-i { 
+            background-color: #f59e0b !important; /* Amber 500 - 当前目标位 */
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+        }
+        
+        .color-j { 
+            background-color: #f97316 !important; /* Orange 500 - 扫描器 */
+            opacity: 0.9;
+        }
+
+        .color-min { 
+            background-color: #ef4444 !important; /* Red 500 - 当前最小值 */
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+            z-index: 20;
+            border: 2px solid #fff;
+        }
+
+        .color-sorted { background-color: #10b981 !important; } /* Emerald 500 */
+        
+        .color-swap { background-color: #8b5cf6 !important; } /* Violet 500 */
+
+        /* 指针指示器系统 */
+        .pointer-container {
+            position: absolute;
+            bottom: -45px; 
+            width: 100%;
+            height: 40px;
+            pointer-events: none;
+        }
+
+        .pointer {
+            position: absolute;
+            transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 20;
+            bottom: 0;
+        }
+
+        .pointer-tag {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 3px 6px;
+            border-radius: 4px;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2px;
+            text-transform: uppercase;
+        }
+
+        .pointer-arrow {
+            width: 0; 
+            height: 0; 
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-bottom: 6px solid;
+        }
+
+        /* 指针特定样式 */
+        .pointer-i .pointer-tag { background-color: #f59e0b; } /* Amber */
+        .pointer-i .pointer-arrow { border-bottom-color: #f59e0b; }
+        
+        .pointer-j .pointer-tag { background-color: #f97316; } /* Orange */
+        .pointer-j .pointer-arrow { border-bottom-color: #f97316; }
+
+        .pointer-min .pointer-tag { background-color: #ef4444; } /* Red */
+        .pointer-min .pointer-arrow { border-bottom-color: #ef4444; }
+        .pointer-min { bottom: -15px; z-index: 25; } /* Min指针稍微错开一点 */
+
+        /* 终端日志 */
+        .log-container {
+            font-family: 'JetBrains Mono', monospace;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #4f46e5;
+        }
+        .log-entry { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: 0; } }
+
+        /* 布局控制 */
+        .layout-default .main-grid { display: flex; flex-direction: column; gap: 1.5rem; }
+        .layout-sidebar .main-grid { display: grid; grid-template-columns: 1fr 350px; gap: 1.5rem; }
+        @media (max-width: 1024px) { .layout-sidebar .main-grid { grid-template-columns: 1fr; } }
+
+        /* 状态灯 */
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .dot-running { background: #10b981; animation: pulse 1.5s infinite; }
+        .dot-paused { background: #f59e0b; }
+        .dot-idle { background: #94a3b8; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+
+        /* 徽章 */
+        .badge { display: inline-flex; align-items: center; padding: 0.125rem 0.5rem; border-radius: 0.375rem; font-size: 0.75rem; font-weight: 600; }
+        .badge-worst { background-color: #fee2e2; color: #991b1b; }
+        .badge-unstable { background-color: #fef3c7; color: #92400e; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <div class="flex items-center gap-3 mb-1">
+                    <div class="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
+                        <i class="fas fa-search-dollar fa-lg"></i>
+                    </div>
+                    <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">选择排序 </h1>
+                </div>
+                <p class="text-slate-500 font-medium">Visualization of Selection Sort Algorithm</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="layoutToggle" class="glass-card px-5 py-2.5 rounded-xl text-slate-700 font-semibold hover:bg-white transition flex items-center gap-2">
+                    <i class="fas fa-columns text-indigo-500"></i> 视图切换
+                </button>
+            </div>
+        </header>
+
+        <div id="mainContent" class="layout-default">
+            
+            <!-- Control Panel -->
+            <section class="glass-card rounded-2xl p-6 mb-6">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-end">
+                    <!-- Size Control -->
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">数组规模</label>
+                            <span id="sizeValue" class="text-indigo-600 font-bold font-mono text-sm">15</span>
+                        </div>
+                        <input type="range" id="sizeSlider" min="5" max="30" value="15" class="w-full accent-indigo-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                    </div>
+                    
+                    <!-- Speed Control -->
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">动画速度</label>
+                            <span id="speedValue" class="text-indigo-600 font-bold font-mono text-sm">5</span>
+                        </div>
+                        <input type="range" id="speedSlider" min="1" max="8" value="4" class="w-full accent-indigo-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                    </div>
+
+                    <!-- Custom Input -->
+                    <div class="lg:col-span-1">
+                        <label class="text-xs font-bold text-slate-500 uppercase block mb-2">自定义数据</label>
+                        <input type="text" id="customArray" placeholder="例如: 5,2,8,1" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm font-mono">
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button id="generateBtn" class="bg-indigo-50 text-indigo-600 h-10 px-4 rounded-xl font-bold hover:bg-indigo-100 transition border border-indigo-100 flex items-center justify-center gap-2">
+                        <i class="fas fa-sync-alt"></i> 生成数组
+                    </button>
+                </div>
+            </section>
+
+            <div class="main-grid">
+                <!-- Left/Top Section: Visualization -->
+                <div class="space-y-6">
+                    <section class="glass-card rounded-3xl p-6 relative flex flex-col">
+                        <!-- Status Bar -->
+                        <div class="flex justify-between items-center mb-8 pb-4 border-b border-slate-100">
+                            <div class="flex items-center gap-4">
+                                <span class="flex items-center text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-1.5 rounded-full shadow-sm">
+                                    <span id="statusIndicator" class="status-dot dot-idle"></span>
+                                    <span id="statusText">准备就绪</span>
+                                </span>
+                                <div class="hidden md:flex items-center gap-2 text-sm bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                                    <span class="text-slate-500 font-semibold">当前最小值:</span>
+                                    <span id="minValueDisplay" class="font-mono font-bold text-rose-500">--</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-slate-400 font-bold uppercase">Comparisons</span>
+                                <div id="compCount" class="font-mono text-xl font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100">
+                                    0
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Visualization Container -->
+                        <div class="visualization-container relative mb-8" style="height: 300px;">
+                            <div id="sortArray" class="array-container">
+                                <!-- Bars injected via JS -->
+                            </div>
+                            <!-- Pointers -->
+                            <div id="pointerContainer" class="pointer-container">
+                                <div id="pointerI" class="pointer pointer-i" style="display:none;">
+                                    <div class="pointer-arrow"></div>
+                                    <div class="pointer-tag">i</div>
+                                </div>
+                                <div id="pointerJ" class="pointer pointer-j" style="display:none;">
+                                    <div class="pointer-arrow"></div>
+                                    <div class="pointer-tag">j</div>
+                                </div>
+                                <div id="pointerMin" class="pointer pointer-min" style="display:none;">
+                                    <div class="pointer-arrow"></div>
+                                    <div class="pointer-tag">min</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Controls -->
+                        <div class="flex flex-wrap justify-center gap-3">
+                            <button id="startBtn" class="group px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-play"></i> 开始排序
+                            </button>
+                            <button id="pauseBtn" disabled class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                                <i class="fas fa-pause"></i> 暂停
+                            </button>
+                            <button id="stepBtn" disabled class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition disabled:opacity-50 active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-step-forward"></i> 单步
+                            </button>
+                            <button id="resetBtn" class="px-6 py-2.5 bg-rose-50 border border-rose-100 text-rose-600 rounded-xl font-bold hover:bg-rose-100 transition active:scale-95 flex items-center gap-2">
+                                <i class="fas fa-undo"></i> 重置
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Terminal Log -->
+                    <section class="log-container rounded-2xl p-4">
+                        <div class="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                            <div class="flex items-center gap-2 text-slate-700 text-xs font-bold uppercase tracking-widest">
+                                <i class="fas fa-terminal text-indigo-500"></i> 执行日志
+                            </div>
+                        </div>
+                        <div id="terminalLog" class="h-32 overflow-y-auto space-y-1.5 text-sm scrollbar-hide px-1">
+                            <div class="text-slate-500 flex items-start gap-2">
+                                <span class="text-indigo-400 font-bold">></span> 
+                                <span>等待系统指令...</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right/Bottom Section: Algorithm Info -->
+                <aside id="infoSection" class="glass-card rounded-2xl p-6 border-t-4 border-indigo-500 h-full">
+                    <div id="introContent">
+                        <h3 class="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2 pb-4 border-b border-slate-100">
+                            <i class="fas fa-book-open text-indigo-500"></i> 算法详解
+                        </h3>
+                        
+                        <!-- Legend -->
+                        <div class="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase mb-3">图例说明</h4>
+                            <div class="grid grid-cols-2 gap-2 text-xs font-medium text-slate-600">
+                                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-amber-500"></div>当前位置 i (待交换)</div>
+                                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-red-500"></div>当前最小值 min</div>
+                                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-orange-400"></div>扫描指针 j</div>
+                                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded bg-emerald-500"></div>已排序区域</div>
+                            </div>
+                        </div>
+
+                        <!-- Algorithm Details -->
+                        <div class="space-y-6 text-slate-600 text-sm">
+                            <div>
+                                <h4 class="font-bold text-slate-800 mb-2">💡 核心思想</h4>
+                                <p class="leading-relaxed">将数组分为已排序和未排序两个区。每轮从未排序区中找到最小元素，放到已排序区的末尾。</p>
+                            </div>
+
+                            <div>
+                                <h4 class="font-bold text-slate-800 mb-2">📊 复杂度分析</h4>
+                                <div class="flex flex-wrap gap-2 mb-2">
+                                    <span class="badge badge-worst">时间: O(n²)</span>
+                                    <span class="badge badge-worst">交换: O(n)</span>
+                                </div>
+                                <p class="text-xs text-slate-500">无论数组是否有序，都需要进行 n(n-1)/2 次比较。</p>
+                            </div>
+
+                            <div>
+                                <h4 class="font-bold text-slate-800 mb-2">⚖️ 稳定性</h4>
+                                <span class="badge badge-unstable mb-1">不稳定</span>
+                                <p class="text-xs text-slate-500 mt-1">例如 [5, 5, 2]，第一个5会与2交换，跑到第二个5后面。</p>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-slate-400 text-xs pb-4">
+            <p>Designed with Tailwind CSS & Glassmorphism</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- 全局变量与状态 ---
+        let array = [];
+        let doms = [];
+        let sortState = {
+            isSorting: false,
+            isPaused: false,
+            comparisons: 0,
+            originalArray: [],
+            isComplete: false,
+            stepMode: false,
+            stepResolver: null,
+            stopFlag: false,
+            currI: -1,
+            currJ: -1,
+            currMin: -1
+        };
+        
+        let speed = 500;
+
+        // --- DOM 元素引用 ---
+        const sizeSlider = document.getElementById('sizeSlider');
+        const sizeValue = document.getElementById('sizeValue');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        const customArrayInput = document.getElementById('customArray');
+        const generateBtn = document.getElementById('generateBtn');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stepBtn = document.getElementById('stepBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const sortArrayContainer = document.getElementById('sortArray');
+        const terminalLog = document.getElementById('terminalLog');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const compCount = document.getElementById('compCount');
+        const minValueDisplay = document.getElementById('minValueDisplay');
+        
+        const pointerI = document.getElementById('pointerI');
+        const pointerJ = document.getElementById('pointerJ');
+        const pointerMin = document.getElementById('pointerMin');
+        
+        const layoutToggle = document.getElementById('layoutToggle');
+        const mainContent = document.getElementById('mainContent');
+
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateSizeValue();
+            updateSpeedValue();
+            generateNewArray();
+            
+            layoutToggle.addEventListener('click', toggleLayout);
+            
+            sizeSlider.addEventListener('input', () => {
+                updateSizeValue();
+                generateNewArray();
+            });
+            
+            speedSlider.addEventListener('input', updateSpeedValue);
+            
+            generateBtn.addEventListener('click', () => {
+                const custom = customArrayInput.value.trim();
+                if (custom) {
+                    try {
+                        const parsed = custom.split(/[,， ]+/).map(Number);
+                        if (parsed.some(isNaN)) throw new Error();
+                        if (parsed.length > 30) { alert('数量过多，建议30以内'); return; }
+                        array = parsed;
+                        resetState();
+                        renderArray();
+                    } catch {
+                        alert('请输入有效的数字数组，例如: 5, 2, 8, 1');
+                    }
+                } else {
+                    generateNewArray();
+                }
+            });
+            
+            startBtn.addEventListener('click', startSelectionSort);
+            pauseBtn.addEventListener('click', togglePause);
+            stepBtn.addEventListener('click', stepExec);
+            resetBtn.addEventListener('click', () => {
+                sortState.stopFlag = true;
+                if (sortState.stepResolver) sortState.stepResolver();
+                setTimeout(() => {
+                    generateNewArray();
+                }, 100);
+            });
+            
+            window.addEventListener('resize', () => {
+                if (array.length > 0) {
+                    renderArray();
+                    if (sortState.isSorting) {
+                        setTimeout(() => {
+                            trackPointer(pointerI, sortState.currI);
+                            trackPointer(pointerJ, sortState.currJ);
+                            trackPointer(pointerMin, sortState.currMin);
+                        }, 50);
+                    }
+                }
+            });
+        });
+
+        // --- 核心逻辑函数 ---
+
+        function toggleLayout() {
+            const isDefault = mainContent.classList.contains('layout-default');
+            if (isDefault) {
+                mainContent.classList.remove('layout-default');
+                mainContent.classList.add('layout-sidebar');
+                layoutToggle.innerHTML = '<i class="fas fa-arrow-up text-indigo-500"></i> 默认视图';
+            } else {
+                mainContent.classList.remove('layout-sidebar');
+                mainContent.classList.add('layout-default');
+                layoutToggle.innerHTML = '<i class="fas fa-columns text-indigo-500"></i> 侧边视图';
+            }
+            setTimeout(() => {
+                renderArray();
+                if(sortState.isSorting) {
+                    trackPointer(pointerI, sortState.currI);
+                    trackPointer(pointerJ, sortState.currJ);
+                    trackPointer(pointerMin, sortState.currMin);
+                }
+            }, 300);
+        }
+
+        function updateSizeValue() { sizeValue.textContent = sizeSlider.value; }
+        
+        function updateSpeedValue() {
+            speedValue.textContent = speedSlider.value;
+            speed = 500 - (speedSlider.value - 1) * 60;
+            if(speed < 50) speed = 50;
+        }
+
+        function generateNewArray() {
+            const size = parseInt(sizeSlider.value);
+            array = [];
+            for (let i = 0; i < size; i++) {
+                array.push(Math.floor(Math.random() * 90) + 10);
+            }
+            resetState();
+            renderArray();
+        }
+
+        function resetState() {
+            sortState = {
+                isSorting: false,
+                isPaused: false,
+                comparisons: 0,
+                originalArray: [...array],
+                isComplete: false,
+                stepMode: false,
+                stepResolver: null,
+                stopFlag: false,
+                currI: -1,
+                currJ: -1,
+                currMin: -1
+            };
+            
+            updateStatus('未开始', 'idle');
+            compCount.textContent = '0';
+            minValueDisplay.textContent = '--';
+            pointerI.style.display = 'none';
+            pointerJ.style.display = 'none';
+            pointerMin.style.display = 'none';
+            terminalLog.innerHTML = '<div class="text-slate-500 flex items-start gap-2"><span class="text-indigo-400 font-bold">></span><span>系统重置就绪</span></div>';
+            
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<i class="fas fa-play"></i> 开始排序';
+            pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+            pauseBtn.disabled = true;
+            stepBtn.disabled = true;
+        }
+
+        function updateStatus(text, type) {
+            statusText.textContent = text;
+            statusIndicator.className = `status-dot dot-${type}`;
+        }
+
+        // 渲染柱状图
+        function renderArray() {
+            sortArrayContainer.innerHTML = '';
+            doms = [];
+            
+            const maxValue = Math.max(...array);
+            const containerWidth = sortArrayContainer.clientWidth;
+            const totalGap = (array.length + 1) * 4;
+            const availableWidth = containerWidth - totalGap;
+            const barWidth = Math.max(10, Math.floor(availableWidth / array.length));
+            const realGap = (containerWidth - barWidth * array.length) / (array.length + 1);
+            
+            array.forEach((value, index) => {
+                const bar = document.createElement('div');
+                bar.className = 'array-bar color-default shadow-sm';
+                bar.style.height = `${(value / maxValue) * 90}%`;
+                bar.style.width = `${barWidth}px`;
+                bar.style.left = `${realGap + index * (barWidth + realGap)}px`;
+                
+                if (barWidth > 24) {
+                    bar.innerHTML = `<span class="mb-1 text-xs text-white font-bold opacity-90">${value}</span>`;
+                }
+                
+                sortArrayContainer.appendChild(bar);
+                doms.push(bar);
+            });
+        }
+
+        async function waitForStep() {
+            if (sortState.stopFlag) throw new Error('ABORT');
+            if (sortState.stepMode) {
+                return new Promise(resolve => { sortState.stepResolver = resolve; });
+            }
+            return new Promise(resolve => setTimeout(resolve, speed));
+        }
+
+        function trackPointer(pointer, index) {
+            if (index < 0 || index >= doms.length) {
+                pointer.style.display = 'none';
+                return;
+            }
+            pointer.style.display = 'flex';
+            const bar = doms[index];
+            const barLeft = parseFloat(bar.style.left);
+            const barWidth = parseFloat(bar.style.width);
+            const pointerWidth = 24; 
+            pointer.style.left = `${barLeft + barWidth/2 - pointerWidth/2}px`;
+        }
+
+        async function swapElements(a, b) {
+            if (a === b) return;
+            
+            const barA = doms[a];
+            const barB = doms[b];
+            
+            // 交换动画前的高亮
+            barA.classList.add('color-swap');
+            barB.classList.add('color-swap');
+            
+            await waitForStep(); 
+            
+            const leftA = barA.style.left;
+            const leftB = barB.style.left;
+            
+            barA.style.left = leftB;
+            barB.style.left = leftA;
+            
+            [doms[a], doms[b]] = [doms[b], doms[a]];
+            [array[a], array[b]] = [array[b], array[a]];
+            
+            // 交换后更新指针，因为指针是根据索引跟踪的，元素变了，索引对应的物理位置也变了
+            trackPointer(pointerI, sortState.currI);
+            trackPointer(pointerMin, sortState.currMin); // 注意这里min的index变了，要在逻辑层更新
+            
+            await waitForStep();
+            
+            barA.classList.remove('color-swap');
+            barB.classList.remove('color-swap');
+        }
+
+        // --- 排序流程 ---
+
+        async function startSelectionSort() {
+            if (sortState.isSorting) return;
+            if (sortState.isComplete) resetState();
+            
+            sortState.isSorting = true;
+            sortState.stopFlag = false;
+            updateStatus('排序中', 'running');
+            
+            startBtn.disabled = true;
+            pauseBtn.disabled = false;
+            stepBtn.disabled = false;
+            
+            try {
+                log('🚀 选择排序开始');
+                await selectionSort();
+                completeSort();
+            } catch (e) {
+                if (e.message !== 'ABORT') console.error(e);
+                updateStatus('已停止', 'paused');
+            }
+        }
+
+        async function selectionSort() {
+            const n = array.length;
+            
+            for (let i = 0; i < n - 1; i++) {
+                sortState.currI = i;
+                trackPointer(pointerI, i);
+                doms[i].classList.add('color-i');
+                log(`第 ${i+1} 轮：寻找第 ${i+1} 小的数`);
+                
+                let minIdx = i;
+                sortState.currMin = minIdx;
+                trackPointer(pointerMin, minIdx);
+                doms[minIdx].classList.add('color-min');
+                minValueDisplay.textContent = array[minIdx];
+                log(`  假设最小值 Min = ${array[minIdx]} (Index ${i})`);
+                
+                await waitForStep();
+
+                for (let j = i + 1; j < n; j++) {
+                    if (sortState.stopFlag) throw new Error('ABORT');
+                    
+                    sortState.currJ = j;
+                    trackPointer(pointerJ, j);
+                    doms[j].classList.add('color-j');
+                    
+                    sortState.comparisons++;
+                    compCount.textContent = sortState.comparisons;
+                    
+                    // log(`  扫描 j[${j}] = ${array[j]}`);
+                    await waitForStep();
+
+                    if (array[j] < array[minIdx]) {
+                        log(`  👀 发现更小值: ${array[j]} < ${array[minIdx]}`);
+                        
+                        // 旧 min 恢复样式 (如果是 i 则恢复 i 样式，否则恢复默认)
+                        doms[minIdx].classList.remove('color-min');
+                        if(minIdx === i) doms[minIdx].classList.add('color-i');
+                        
+                        minIdx = j;
+                        sortState.currMin = minIdx;
+                        minValueDisplay.textContent = array[minIdx];
+                        
+                        doms[minIdx].classList.add('color-min');
+                        doms[minIdx].classList.remove('color-j'); // remove scan color
+                        trackPointer(pointerMin, minIdx);
+                        
+                        await waitForStep();
+                    }
+                    
+                    // j 移走，恢复颜色
+                    if (j !== minIdx && j !== i) {
+                        doms[j].classList.remove('color-j');
+                    } else if (j === minIdx) {
+                        doms[j].classList.remove('color-j');
+                        // keep min color
+                    }
+                }
+                
+                // End of inner loop
+                pointerJ.style.display = 'none';
+                
+                if (minIdx !== i) {
+                    log(`  🔄 交换: ${array[i]} (当前位) <-> ${array[minIdx]} (最小值)`);
+                    
+                    // 交换前确保颜色正确
+                    doms[minIdx].classList.remove('color-min'); // 交换时由 swap 动画接管
+                    doms[i].classList.remove('color-i');
+                    
+                    // 这里 minIdx 和 i 的位置会在 doms 中互换
+                    // 为了动画连贯，我们传入逻辑索引
+                    await swapElements(i, minIdx);
+                    
+                    // 交换后，原来的 array[minIdx] 现在在 array[i]
+                    // 原来的 array[i] 现在在 array[minIdx]
+                } else {
+                    log(`  ✅ 当前位置 ${i} 已经是最小值，无需交换`);
+                    doms[i].classList.remove('color-min', 'color-i');
+                }
+
+                // 标记已排序
+                doms[i].classList.add('color-sorted');
+                await waitForStep();
+            }
+            
+            // 处理最后一个元素
+            doms[n-1].classList.add('color-sorted');
+        }
+
+        function togglePause() {
+            if (!sortState.isSorting) return;
+            sortState.isPaused = !sortState.isPaused;
+            sortState.stepMode = sortState.isPaused;
+            
+            if (sortState.isPaused) {
+                pauseBtn.innerHTML = '<i class="fas fa-play"></i> 继续';
+                updateStatus('已暂停', 'paused');
+                log('⏸️ 流程暂停');
+            } else {
+                pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+                updateStatus('排序中', 'running');
+                log('▶️ 流程继续');
+                if (sortState.stepResolver) {
+                    sortState.stepResolver();
+                    sortState.stepResolver = null;
+                }
+            }
+        }
+
+        function stepExec() {
+            if (!sortState.isSorting) {
+                startSelectionSort();
+                sortState.stepMode = true;
+                sortState.isPaused = true;
+                pauseBtn.innerHTML = '<i class="fas fa-play"></i> 继续';
+                updateStatus('单步模式', 'paused');
+            } else if (sortState.stepMode && sortState.stepResolver) {
+                sortState.stepResolver();
+                sortState.stepResolver = null;
+            }
+        }
+
+        function completeSort() {
+            sortState.isSorting = false;
+            sortState.isComplete = true;
+            updateStatus('已完成', 'running');
+            minValueDisplay.textContent = '--';
+            pointerI.style.display = 'none';
+            pointerJ.style.display = 'none';
+            pointerMin.style.display = 'none';
+            
+            doms.forEach(bar => {
+                bar.className = 'array-bar color-sorted shadow-md';
+                bar.style.transform = 'translateY(-5px)';
+                setTimeout(() => bar.style.transform = 'translateY(0)', 300);
+            });
+            
+            startBtn.disabled = false;
+            startBtn.innerHTML = '<i class="fas fa-redo"></i> 重新开始';
+            pauseBtn.disabled = true;
+            stepBtn.disabled = true;
+            log('🏆 排序完成！共比较 ' + sortState.comparisons + ' 次');
+        }
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.className = 'log-entry text-slate-600 flex items-start gap-2 border-l-2 border-indigo-100 pl-2 py-1';
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+            div.innerHTML = `<span class="text-xs text-indigo-400 font-mono mt-0.5">[${time}]</span> <span class="flex-1">${msg}</span>`;
+            terminalLog.appendChild(div);
+            terminalLog.scrollTop = terminalLog.scrollHeight;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排序算法可视化中心 | Algorithm Visualization Hub</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary-color: #3b82f6;
+            --secondary-color: #10b981;
+            --accent-color: #8b5cf6;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --dark-color: #1e293b;
+            --light-color: #f8fafc;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #fef7ff 100%);
+            min-height: 100vh;
+        }
+        
+        .navbar-gradient {
+            background: linear-gradient(90deg, #1e293b 0%, #334155 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .algorithm-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+        
+        .algorithm-tag.comparison {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+        }
+        
+        .algorithm-tag.non-comparison {
+            background-color: #dcfce7;
+            color: #047857;
+        }
+        
+        .algorithm-tag.divide-conquer {
+            background-color: #f3e8ff;
+            color: #7c3aed;
+        }
+        
+        .algorithm-tag.in-place {
+            background-color: #fef3c7;
+            color: #b45309;
+        }
+        
+        .complexity-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background-color: #f1f5f9;
+            color: #475569;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .complexity-badge.good {
+            background-color: #dcfce7;
+            color: #047857;
+        }
+        
+        .complexity-badge.medium {
+            background-color: #fef3c7;
+            color: #b45309;
+        }
+        
+        .complexity-badge.poor {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+        }
+        
+        .footer-gradient {
+            background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
+        }
+        
+        .algo-card {
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+        
+        .algo-card:hover {
+            border-left-width: 8px;
+        }
+        
+        /* 算法卡片颜色 */
+        .algo-card.quick-sort { border-color: #ef4444; }
+        .algo-card.heap-sort { border-color: #10b981; }
+        .algo-card.selection-sort { border-color: #f59e0b; }
+        .algo-card.merge-sort { border-color: #8b5cf6; }
+        .algo-card.insertion-sort { border-color: #ec4899; }
+        .algo-card.radix-sort { border-color: #06b6d4; }
+        .algo-card.bubble-sort { border-color: #14b8a6; }
+        .algo-card.bucket-sort { border-color: #f97316; }
+        .algo-card.counting-sort { border-color: #84cc16; }
+    </style>
+</head>
+<body class="text-gray-800">
+    <!-- 导航栏 -->
+    <nav class="navbar-gradient shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-sort-amount-down-alt text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-white">排序算法可视化中心</h1>
+                        <p class="text-sm text-blue-200">Algorithm Visualization Hub</p>
+                    </div>
+                </div>
+                
+                <div class="hidden md:flex space-x-6">
+                    <a href="#algorithms" class="text-white hover:text-blue-300 font-medium">算法演示</a>
+                    <a href="#features" class="text-white hover:text-blue-300 font-medium">特色功能</a>
+                    <a href="#about" class="text-white hover:text-blue-300 font-medium">关于我们</a>
+                </div>
+                
+                <div class="md:hidden">
+                    <button id="mobile-menu-button" class="text-white focus:outline-none">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 移动端菜单 -->
+            <div id="mobile-menu" class="hidden md:hidden mt-4 pb-2">
+                <a href="#algorithms" class="block py-2 text-white hover:text-blue-300">算法演示</a>
+                <a href="#features" class="block py-2 text-white hover:text-blue-300">特色功能</a>
+                <a href="#about" class="block py-2 text-white hover:text-blue-300">关于我们</a>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- 英雄区域 -->
+    <header class="hero-gradient py-12 md:py-20">
+        <div class="container mx-auto px-4">
+            <div class="max-w-4xl mx-auto text-center">
+                <h1 class="text-4xl md:text-5xl font-bold mb-6">探索排序算法的奥秘</h1>
+                <p class="text-xl text-gray-700 mb-8">通过交互式可视化，深入理解九种经典排序算法的工作原理、时间复杂度和实际表现。</p>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <a href="#algorithms" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold shadow-lg hover:shadow-xl transition">
+                        <i class="fas fa-play-circle mr-2"></i>开始探索
+                    </a>
+                    <a href="#features" class="bg-white text-gray-800 px-6 py-3 rounded-lg font-semibold border border-gray-300 hover:bg-gray-50 transition">
+                        <i class="fas fa-info-circle mr-2"></i>了解功能
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- 算法演示区 -->
+    <section id="algorithms" class="py-16 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold mb-4 gradient-text">排序算法演示</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto">点击下方卡片进入对应的排序算法可视化演示页面，每个演示都提供了详细的动画和说明。</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- 快速排序 -->
+                <div class="algo-card quick-sort bg-white rounded-xl shadow-md overflow-hidden card-hover">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">快速排序</h3>
+                                <p class="text-sm text-gray-500">分治算法，平均性能优秀</p>
+                            </div>
+                            <span class="algorithm-tag divide-conquer">分治法</span>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-4">通过选择一个基准元素，将数组分为两部分，递归地对子数组进行排序。</p>
+                        
+                        <div class="mb-4">
+                            <span class="complexity-badge good">平均: O(n log n)</span>
+                            <span class="complexity-badge poor">最坏: O(n²)</span>
+                            <span class="complexity-badge">空间: O(log n)</span>
+                            <span class="algorithm-tag in-place">原地排序</span>
+                        </div>
+                        
+                        <a href="quick-sort.html" target="_self" class="block w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-center py-3 rounded-lg font-medium transition">
+                            <i class="fas fa-external-link-alt mr-2"></i>进入演示
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 堆排序 -->
+                <div class="algo-card heap-sort bg-white rounded-xl shadow-md overflow-hidden card-hover">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">堆排序</h3>
+                                <p class="text-sm text-gray-500">基于二叉堆的排序</p>
+                            </div>
+                            <span class="algorithm-tag comparison">比较排序</span>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-4">利用堆数据结构，将数组转换为最大堆，然后逐步提取最大元素完成排序。</p>
+                        
+                        <div class="mb-4">
+                            <span class="complexity-badge medium">平均: O(n log n)</span>
+                            <span class="complexity-badge medium">最坏: O(n log n)</span>
+                            <span class="complexity-badge">空间: O(1)</span>
+                            <span class="algorithm-tag in-place">原地排序</span>
+                        </div>
+                        
+                        <a href="heap-sort.html" target="_self" class="block w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-center py-3 rounded-lg font-medium transition">
+                            <i class="fas fa-external-link-alt mr-2"></i>进入演示
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 选择排序 -->
+                <div class="algo-card selection-sort bg-white rounded-xl shadow-md overflow-hidden card-hover">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">选择排序</h3>
+                                <p class="text-sm text-gray-500">简单直观的排序算法</p>
+                            </div>
+                            <span class="algorithm-tag comparison">比较排序</span>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-4">每次从未排序部分选择最小（或最大）元素，放到已排序部分的末尾。</p>
+                        
+                        <div class="mb-4">
+                            <span class="complexity-badge poor">平均: O(n²)</span>
+                            <span class="complexity-badge poor">最坏: O(n²)</span>
+                            <span class="complexity-badge">空间: O(1)</span>
+                            <span class="algorithm-tag in-place">原地排序</span>
+                        </div>
+                        
+                        <a href="selection-sort.html" target="_self" class="block w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white text-center py-3 rounded-lg font-medium transition">
+                            <i class="fas fa-external-link-alt mr-2"></i>进入演示
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 归并排序 -->
+                <div class="algo-card merge-sort bg-white rounded-xl shadow-md overflow-hidden card-hover">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">归并排序</h3>
+                                <p class="text-sm text-gray-500">稳定的分治排序算法</p>
+                            </div>
+                            <span class="algorithm-tag divide-conquer">分治法</span>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-4">将数组递归地分成两半，分别排序后合并，是典型的分治算法。</p>
+                        
+                        <div class="mb-4">
+                            <span class="complexity-badge good">平均: O(n log n)</span>
+                            <span class="complexity-badge good">最坏: O(n log n)</span>
+                            <span class="complexity-badge">空间: O(n)</span>
+                        </div>
+                        
+                        <a href="merge-sort.html" target="_self" class="block w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white text-center py-3 rounded-lg font-medium transition">
+                            <i class="fas fa-external-link-alt mr-2"></i>进入演示
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 插入排序 -->
+                <div class="algo-card insertion-sort bg-white rounded-xl shadow-md overflow-hidden card-hover">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">插入排序</h3>
+                                <p class="text-sm text-gray-500">简单且对小数据高效</p>
+                            </div>
+                            <span class="algorithm-tag comparison">比较排序</span>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-4">通过构建有序序列，对于未排序数据，在已排序序列中从后向前扫描，找到相应位置并插入。</p>
+                        
+                        <div class="mb-4">
+                            <span class="complexity-badge medium">平均: O(n²)</span>
+                            <span class="complexity-badge poor">最坏: O(n²)</span>
+                            <span class="complexity-badge good">最佳: O(n)</span>
+                            <span class="complexity-badge">空间: O(1)</span>
+                            <span class="algorithm-tag in-place">原地排序</span>
+                        </div>
+                        
+                        <a href="insertion.html" target="_self" class="block w-full bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white text-center py-3 rounded-lg font-medium transition">
+                            <i class="fas fa-external-link-alt mr-2"></i>进入演示
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 基数排序 -->
+                <div class="algo-card radix-sort bg-white rounded-xl shadow-md overflow-hidden card-hover">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">基数排序</h3>
+                                <p class="text-sm text-gray-500">非比较型整数排序算法</p>
+                            </div>
+                            <span class="algorithm-tag non-comparison">非比较排序</span>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-4">按照低位先排序，然后收集；再按照高位排序，然后再收集；依次类推，直到最高位。</p>
+                        
+                        <div class="mb-4">
+                            <span class="complexity-badge good">平均: O(nk)</span>
+                            <span class="complexity-badge good">最坏: O(nk)</span>
+                            <span class="complexity-badge">空间: O(n+k)</span>
+                        </div>
+                        
+                        <a href="radix sort.html" target="_self" class="block w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-center py-3 rounded-lg font-medium transition">
+                            <i class="fas fa-external-link-alt mr-2"></i>进入演示
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 冒泡排序 -->
+                <div class="algo-card bubble-sort bg-white rounded-xl shadow-md overflow-hidden card-hover">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">冒泡排序</h3>
+                                <p class="text-sm text-gray-500">最简单的排序算法之一</p>
+                            </div>
+                            <span class="algorithm-tag comparison">比较排序</span>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-4">重复地遍历要排序的数列，一次比较两个元素，如果它们的顺序错误就把它们交换过来。</p>
+                        
+                        <div class="mb-4">
+                            <span class="complexity-badge poor">平均: O(n²)</span>
+                            <span class="complexity-badge poor">最坏: O(n²)</span>
+                            <span class="complexity-badge good">最佳: O(n)</span>
+                            <span class="complexity-badge">空间: O(1)</span>
+                            <span class="algorithm-tag in-place">原地排序</span>
+                        </div>
+                        
+                        <a href="bubble(2).html" target="_self" class="block w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-center py-3 rounded-lg font-medium transition">
+                            <i class="fas fa-external-link-alt mr-2"></i>进入演示
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 桶排序 -->
+                <div class="algo-card bucket-sort bg-white rounded-xl shadow-md overflow-hidden card-hover">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">桶排序</h3>
+                                <p class="text-sm text-gray-500">分布式排序算法</p>
+                            </div>
+                            <span class="algorithm-tag non-comparison">非比较排序</span>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-4">将数组分到有限数量的桶里，每个桶再分别排序，最后将各个桶中的数据有序合并。</p>
+                        
+                        <div class="mb-4">
+                            <span class="complexity-badge good">平均: O(n+k)</span>
+                            <span class="complexity-badge poor">最坏: O(n²)</span>
+                            <span class="complexity-badge">空间: O(n+k)</span>
+                        </div>
+                        
+                        <a href="bucket.html" target="_self" class="block w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white text-center py-3 rounded-lg font-medium transition">
+                            <i class="fas fa-external-link-alt mr-2"></i>进入演示
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 计数排序 -->
+                <div class="algo-card counting-sort bg-white rounded-xl shadow-md overflow-hidden card-hover">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-800">计数排序</h3>
+                                <p class="text-sm text-gray-500">非比较型整数排序算法</p>
+                            </div>
+                            <span class="algorithm-tag non-comparison">非比较排序</span>
+                        </div>
+                        
+                        <p class="text-gray-600 mb-4">使用一个额外的数组来计数，然后根据计数数组将元素放回原数组，从而完成排序。</p>
+                        
+                        <div class="mb-4">
+                            <span class="complexity-badge good">平均: O(n+k)</span>
+                            <span class="complexity-badge good">最坏: O(n+k)</span>
+                            <span class="complexity-badge">空间: O(k)</span>
+                        </div>
+                        
+                        <a href="counting.html" target="_self" class="block w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-center py-3 rounded-lg font-medium transition">
+                            <i class="fas fa-external-link-alt mr-2"></i>进入演示
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 特色功能 -->
+    <section id="features" class="py-16 bg-gray-50">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold mb-4 gradient-text">特色功能</h2>
+                <p class="text-gray-600 max-w-2xl mx-auto">我们的可视化工具提供了丰富的功能，帮助您更好地理解和学习排序算法</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                    <div class="feature-icon bg-blue-100 text-blue-600 mx-auto">
+                        <i class="fas fa-play-circle"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">交互式动画</h3>
+                    <p class="text-gray-600">每个算法都有详细的动画演示，可调整速度、暂停、重置，控制每一步的执行。</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                    <div class="feature-icon bg-green-100 text-green-600 mx-auto">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">可视化对比</h3>
+                    <p class="text-gray-600">使用不同颜色高亮显示算法中的关键步骤，如比较、交换、分区等操作。</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                    <div class="feature-icon bg-purple-100 text-purple-600 mx-auto">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">代码跟踪</h3>
+                    <p class="text-gray-600">算法演示与代码执行同步，实时显示当前执行的代码行，加深理解。</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                    <div class="feature-icon bg-orange-100 text-orange-600 mx-auto">
+                        <i class="fas fa-sliders-h"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">参数自定义</h3>
+                    <p class="text-gray-600">支持自定义数组大小、数组元素、动画速度等参数，满足不同学习需求。</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 关于我们 -->
+    <section id="about" class="py-16 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="max-w-4xl mx-auto">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold mb-4 gradient-text">关于排序算法可视化中心</h2>
+                    <p class="text-gray-600">我们的目标是通过交互式可视化帮助学习者深入理解排序算法的原理和性能</p>
+                </div>
+                
+                <div class="bg-gradient-to-r from-blue-50 to-purple-50 p-8 rounded-2xl shadow-inner">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 text-gray-800">项目背景</h3>
+                            <p class="text-gray-700 mb-4">
+                                排序算法是计算机科学的基础知识，但对于初学者来说，理解算法的执行过程往往比较抽象。
+                                我们开发了这个可视化平台，通过动画演示将抽象的概念变得直观易懂。
+                            </p>
+                            <p class="text-gray-700">
+                                本项目整合了多个独立的排序算法演示页面，提供了一个统一、美观的入口，方便用户比较不同算法的特点和性能。
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-xl font-bold mb-4 text-gray-800">技术特点</h3>
+                            <ul class="space-y-3 text-gray-700">
+                                <li class="flex items-start">
+                                    <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
+                                    <span>使用纯HTML5、CSS3和JavaScript实现，无需插件</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
+                                    <span>响应式设计，适配各种设备屏幕</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
+                                    <span>平滑的动画过渡效果，提升用户体验</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-check text-green-500 mt-1 mr-3"></i>
+                                    <span>详细的算法说明和复杂度分析</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8 pt-8 border-t border-gray-200">
+                        <h3 class="text-xl font-bold mb-4 text-gray-800">适用人群</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                            <div class="text-center p-4 bg-white rounded-lg shadow-sm">
+                                <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <i class="fas fa-user-graduate"></i>
+                                </div>
+                                <h4 class="font-bold text-gray-800">计算机学生</h4>
+                                <p class="text-sm text-gray-600 mt-2">辅助数据结构与算法课程学习</p>
+                            </div>
+                            <div class="text-center p-4 bg-white rounded-lg shadow-sm">
+                                <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <i class="fas fa-chalkboard-teacher"></i>
+                                </div>
+                                <h4 class="font-bold text-gray-800">教师与讲师</h4>
+                                <p class="text-sm text-gray-600 mt-2">课堂演示和教学工具</p>
+                            </div>
+                            <div class="text-center p-4 bg-white rounded-lg shadow-sm">
+                                <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <i class="fas fa-laptop-code"></i>
+                                </div>
+                                <h4 class="font-bold text-gray-800">编程爱好者</h4>
+                                <p class="text-sm text-gray-600 mt-2">深入理解算法原理与实现</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- 页脚 -->
+    <footer class="footer-gradient text-white py-10">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-6 md:mb-0">
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-sort-amount-down-alt"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold">排序算法可视化中心</h2>
+                            <p class="text-sm text-blue-200">Algorithm Visualization Hub</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-300 max-w-md">通过交互式可视化帮助学习者深入理解排序算法的原理和性能，促进计算机科学教育。</p>
+                </div>
+                
+                <div class="text-center md:text-right">
+                    <h3 class="text-lg font-bold mb-4">快速链接</h3>
+                    <div class="flex flex-col space-y-2">
+                        <a href="#algorithms" class="text-gray-300 hover:text-white transition">算法演示</a>
+                        <a href="#features" class="text-gray-300 hover:text-white transition">特色功能</a>
+                        <a href="#about" class="text-gray-300 hover:text-white transition">关于我们</a>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-center md:justify-end space-x-4">
+                        <a href="#" class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center hover:bg-blue-700 transition">
+                            <i class="fab fa-github"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center hover:bg-blue-600 transition">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition">
+                            <i class="fab fa-youtube"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-8 pt-6 border-t border-gray-700 text-center text-gray-400">
+                <p>© 2023 排序算法可视化中心. 本网站仅供学习使用.</p>
+            </div>
+        </div>
+    </footer>
+    
+    <script>
+        // 移动端菜单切换
+        document.getElementById('mobile-menu-button').addEventListener('click', function() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        });
+        
+        // 平滑滚动
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                if(this.getAttribute('href') === '#') return;
+                
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const targetElement = document.querySelector(targetId);
+                
+                if(targetElement) {
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 80,
+                        behavior: 'smooth'
+                    });
+                    
+                    // 关闭移动端菜单
+                    const mobileMenu = document.getElementById('mobile-menu');
+                    mobileMenu.classList.add('hidden');
+                }
+            });
+        });
+        
+        // 页面加载动画
+        document.addEventListener('DOMContentLoaded', function() {
+            // 卡片动画
+            const cards = document.querySelectorAll('.algo-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, 100 + index * 100);
+            });
+        });
+    </script>
+</body>
+</html>

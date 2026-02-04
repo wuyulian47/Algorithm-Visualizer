@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>堆排序可视化 Pro | Heap Sort</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #4f46e5;
+            --bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg-gradient);
+            color: #334155;
+            min-height: 100vh;
+        }
+
+        /* 玻璃拟态卡片 */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+        }
+
+        /* --- 堆节点样式 --- */
+        .tree-container {
+            position: relative;
+            width: 100%;
+            overflow: hidden; 
+            display: flex;
+            justify-content: center;
+            transition: height 0.3s ease;
+        }
+
+        .node {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 14px;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+            z-index: 20;
+            border: 2px solid white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            will-change: transform, top, left;
+        }
+
+        /* 交换动画类 - 物理移动 */
+        .node-moving {
+            transition: transform 0.4s ease-in-out !important;
+            z-index: 50 !important;
+        }
+
+        /* 颜色定义 */
+        .color-default { background-color: #60a5fa; } 
+        .color-compare { 
+            background-color: #f59e0b !important; 
+            transform: scale(1.15);
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.6);
+            z-index: 30;
+        }
+        .color-swap { 
+            background-color: #8b5cf6 !important; 
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.6);
+            z-index: 40;
+        }
+        .color-root {
+            background-color: #ec4899 !important; 
+            border: 2px solid #fbcfe8;
+        }
+        .color-sorted { 
+            background-color: #10b981 !important; 
+            opacity: 0.6;
+            border: 2px dashed #a7f3d0;
+        }
+        .color-check {
+            background-color: #0ea5e9 !important; 
+            border: 2px solid #bae6fd;
+        }
+
+        /* 连线 */
+        .tree-line {
+            height: 2px;
+            transform-origin: top left;
+            position: absolute;
+            z-index: 10;
+            background-color: #cbd5e1;
+            transition: opacity 0.2s ease;
+        }
+        .line-sorted {
+            border-top: 2px dashed #e2e8f0;
+            background-color: transparent;
+        }
+
+        /* 终端日志 */
+        .log-container {
+            font-family: 'JetBrains Mono', monospace;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #4f46e5;
+            transition: height 0.3s ease;
+        }
+        .log-entry { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: 0; } }
+
+        /* --- 布局切换逻辑 --- */
+        .layout-grid {
+            display: grid;
+            gap: 1.5rem;
+            transition: all 0.5s ease;
+        }
+
+        /* 侧边布局 (默认) */
+        .layout-side {
+            grid-template-columns: 2fr 1fr;
+        }
+        .layout-side .vis-panel { height: 680px; } /* 稍微增加高度以容纳更多信息 */
+        .layout-side .info-panel { height: 680px; }
+
+        /* 底部布局 - 修改后支持3列 */
+        .layout-bottom {
+            grid-template-columns: 1fr;
+        }
+        .layout-bottom .vis-panel { height: 600px; }
+        .layout-bottom .info-panel { height: auto; min-height: 300px; }
+        /* 修改这里：底部模式下改为3列布局：图例 | 理论 | 日志 */
+        .layout-bottom .info-content { 
+            display: grid; 
+            grid-template-columns: 0.8fr 1fr 1.2fr; /* 调整比例 */
+            gap: 1.5rem; 
+        }
+
+        @media (max-width: 1024px) { 
+            .layout-side { grid-template-columns: 1fr; } 
+            .layout-side .vis-panel { height: auto; min-height: 400px; }
+            .layout-side .info-panel { height: auto; }
+            .layout-bottom .info-content { grid-template-columns: 1fr; } /* 移动端单列 */
+        }
+
+        /* 状态灯 */
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .dot-running { background: #10b981; animation: pulse 1.5s infinite; }
+        .dot-paused { background: #f59e0b; }
+        .dot-idle { background: #94a3b8; }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* 理论卡片样式 */
+        .theory-list li {
+            position: relative;
+            padding-left: 1rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.75rem;
+            line-height: 1.4;
+            color: #475569;
+        }
+        .theory-list li::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 6px;
+            width: 4px;
+            height: 4px;
+            background: #4f46e5;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+            <div>
+                <div class="flex items-center gap-3 mb-1">
+                    <div class="p-2 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-200">
+                        <i class="fas fa-network-wired fa-lg"></i>
+                    </div>
+                    <h1 class="text-3xl font-extrabold text-slate-800 tracking-tight">堆排序 <span class="text-lg font-medium text-slate-400 ml-2">Heap Sort Pro</span></h1>
+                </div>
+                <p class="text-slate-500 font-medium text-sm">完全二叉树的可视化构建与排序过程</p>
+            </div>
+            
+            <!-- 视图切换按钮 -->
+            <button id="layoutToggleBtn" class="glass-card px-5 py-2.5 rounded-xl text-slate-700 font-semibold hover:bg-white transition flex items-center gap-2 text-sm shadow-sm active:scale-95">
+                <i class="fas fa-columns text-indigo-500"></i>
+                <span id="layoutBtnText">切换到底部视图</span>
+            </button>
+        </header>
+
+        <!-- Control Panel -->
+        <section class="glass-card rounded-2xl p-5 mb-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
+                <!-- Size Control -->
+                <div class="lg:col-span-3">
+                    <div class="flex justify-between mb-2">
+                        <label class="text-xs font-bold text-slate-500 uppercase">节点数量</label>
+                        <span id="sizeValue" class="text-indigo-600 font-bold font-mono text-sm">15</span>
+                    </div>
+                    <input type="range" id="sizeSlider" min="3" max="31" value="15" class="w-full accent-indigo-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                </div>
+                
+                <!-- Speed Control -->
+                <div class="lg:col-span-3">
+                    <div class="flex justify-between mb-2">
+                        <label class="text-xs font-bold text-slate-500 uppercase">动画速度</label>
+                        <span id="speedValue" class="text-indigo-600 font-bold font-mono text-sm">5</span>
+                    </div>
+                    <input type="range" id="speedSlider" min="1" max="10" value="5" class="w-full accent-indigo-600 cursor-pointer h-2 bg-slate-200 rounded-lg appearance-none">
+                </div>
+
+                <!-- Custom Input -->
+                <div class="lg:col-span-3">
+                    <label class="text-xs font-bold text-slate-500 uppercase block mb-2">自定义数组</label>
+                    <input type="text" id="customArray" placeholder="如: 50,30,10" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-sm font-mono">
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="lg:col-span-3 flex gap-2">
+                    <button id="generateBtn" class="flex-1 bg-indigo-600 text-white h-10 px-4 rounded-xl font-bold hover:bg-indigo-700 transition flex items-center justify-center gap-2 text-sm shadow-md shadow-indigo-200 active:scale-95">
+                        <i class="fas fa-random"></i> 随机生成
+                    </button>
+                    <button id="resetBtn" class="flex-1 bg-rose-50 text-rose-600 border border-rose-200 h-10 px-4 rounded-xl font-bold hover:bg-rose-100 hover:border-rose-300 transition flex items-center justify-center gap-2 text-sm active:scale-95">
+                        <i class="fas fa-undo"></i> 重置数组
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Layout Grid -->
+        <div id="mainLayout" class="layout-grid layout-side">
+            
+            <!-- Left/Top: Visualization -->
+            <div class="vis-panel flex flex-col">
+                <section class="glass-card rounded-3xl p-6 relative flex flex-col h-full transition-all duration-300">
+                    <!-- Status Bar -->
+                    <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
+                        <div class="flex items-center gap-4">
+                            <span class="flex items-center text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-1.5 rounded-full shadow-sm">
+                                <span id="statusIndicator" class="status-dot dot-idle"></span>
+                                <span id="statusText">准备就绪</span>
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-400 font-bold uppercase">Step</span>
+                            <div id="stepCountDisplay" class="font-mono text-sm font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100">
+                                0 / 0
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visualization Container (Tree) -->
+                    <div id="heapTree" class="tree-container flex-grow relative"></div>
+
+                    <!-- Description Box (Floating) -->
+                    <div class="absolute bottom-20 left-6 right-6 bg-white/90 backdrop-blur border border-slate-200 rounded-xl p-3 shadow-sm text-center z-40">
+                        <p id="descText" class="text-sm font-medium text-slate-600">点击播放开始堆排序...</p>
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="flex justify-center gap-3 mt-4 z-50">
+                        <button id="heapSortBtn" class="group px-8 py-2.5 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 active:scale-95 flex items-center gap-2">
+                            <i class="fas fa-play"></i> 开始
+                        </button>
+                        <button id="heapPauseBtn" disabled class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition disabled:opacity-50 flex items-center gap-2">
+                            <i class="fas fa-pause"></i> 暂停
+                        </button>
+                        <button id="heapStepBtn" class="px-6 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition disabled:opacity-50 active:scale-95 flex items-center gap-2">
+                            <i class="fas fa-step-forward"></i> 单步
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right/Bottom: Info & Log -->
+            <div class="info-panel flex flex-col h-full transition-all duration-300">
+                 <div class="info-content h-full flex flex-col gap-4">
+                     
+                     <!-- 1. Legend -->
+                     <aside class="glass-card rounded-2xl p-4 border-t-4 border-indigo-500 flex-shrink-0">
+                        <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                            <i class="fas fa-map-signs text-indigo-500"></i> 图例说明
+                        </h3>
+                        <div class="grid grid-cols-2 gap-y-2 gap-x-1 text-xs font-medium text-slate-600">
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-blue-400"></div>普通节点</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-pink-500"></div>堆顶(最大)</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-amber-500 shadow-sm shadow-amber-200"></div>比较中</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-purple-500 shadow-sm shadow-purple-200"></div>交换中</div>
+                            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-emerald-500 opacity-60 border border-dashed border-emerald-300"></div>已排序</div>
+                        </div>
+                    </aside>
+
+                    <!-- 2. Core Idea / Algorithm Theory (NEW ADDITION) -->
+                    <section class="glass-card rounded-2xl p-4 border-t-4 border-pink-500 flex-shrink-0 overflow-y-auto" style="max-height: 200px;">
+                        <h3 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-2">
+                            <i class="fas fa-book-open text-pink-500"></i> 算法核心思想
+                        </h3>
+                        <div class="text-slate-600 text-xs leading-relaxed">
+                            <p class="mb-2 font-medium">堆排序利用<span class="text-indigo-600">完全二叉树</span>结构，分为两步：</p>
+                            <ul class="theory-list space-y-1">
+                                <li>
+                                    <span class="font-bold text-slate-700">1. 构建大顶堆 (Build Heap)</span><br>
+                                    从最后一个非叶子节点开始，自下而上进行"下沉"调整，保证<span class="bg-indigo-50 px-1 rounded text-indigo-700">父节点 ≥ 子节点</span>。
+                                </li>
+                                <li>
+                                    <span class="font-bold text-slate-700">2. 排序 (Sort)</span><br>
+                                    将堆顶（最大值）与末尾元素<span class="text-purple-600 font-bold">交换</span>，堆大小减1，再对堆顶进行下沉调整(Heapify)。
+                                </li>
+                            </ul>
+                            <div class="mt-2 pt-2 border-t border-slate-100 flex justify-between text-[10px] text-slate-400 font-mono">
+                                <span>时间: O(n log n)</span>
+                                <span>空间: O(1)</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- 3. Terminal Log -->
+                    <section class="glass-card rounded-2xl p-4 flex-grow flex flex-col overflow-hidden border-t-4 border-slate-400 log-container min-h-[150px]">
+                        <div class="flex items-center justify-between mb-3 border-b border-slate-200 pb-2 flex-shrink-0">
+                            <div class="flex items-center gap-2 text-slate-700 text-xs font-bold uppercase tracking-widest">
+                                <i class="fas fa-terminal text-indigo-500"></i> 系统日志
+                            </div>
+                            <button id="clearLog" class="text-xs text-slate-400 hover:text-slate-600 transition"><i class="fas fa-trash"></i> 清空</button>
+                        </div>
+                        <div id="terminalLog" class="flex-grow overflow-y-auto space-y-2 text-xs scrollbar-hide px-1 font-mono">
+                            <div class="text-slate-500 flex items-start gap-2">
+                                <span class="text-indigo-400 font-bold">></span> 
+                                <span>等待指令...</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-slate-400 text-xs pb-4">
+            <p>Designed for Heap Sort Algorithm Visualization</p>
+        </footer>
+    </div>
+
+    <script>
+        // --- 全局状态管理 ---
+        let array = [];
+        let heapSortState = {
+            isSorting: false,
+            isPaused: false,
+            isAnimating: false,
+            currentStep: 0,
+            totalSteps: 0,
+            animationQueue: [],
+            currentAnimationTimer: null,
+            speedMs: 500
+        };
+        let isSidebarLayout = true;
+
+        // --- DOM 引用 ---
+        const els = {
+            sizeSlider: document.getElementById('sizeSlider'),
+            sizeValue: document.getElementById('sizeValue'),
+            speedSlider: document.getElementById('speedSlider'),
+            speedValue: document.getElementById('speedValue'),
+            customArray: document.getElementById('customArray'),
+            generateBtn: document.getElementById('generateBtn'),
+            resetBtn: document.getElementById('resetBtn'),
+            sortBtn: document.getElementById('heapSortBtn'),
+            pauseBtn: document.getElementById('heapPauseBtn'),
+            stepBtn: document.getElementById('heapStepBtn'),
+            tree: document.getElementById('heapTree'),
+            desc: document.getElementById('descText'),
+            statusIndicator: document.getElementById('statusIndicator'),
+            statusText: document.getElementById('statusText'),
+            stepCount: document.getElementById('stepCountDisplay'),
+            terminalLog: document.getElementById('terminalLog'),
+            clearLog: document.getElementById('clearLog'),
+            layoutBtn: document.getElementById('layoutToggleBtn'),
+            layoutText: document.getElementById('layoutBtnText'),
+            mainLayout: document.getElementById('mainLayout')
+        };
+
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateSpeed();
+            generateArray(); // 初始生成
+            
+            // 事件监听
+            els.sizeSlider.addEventListener('input', () => {
+                els.sizeValue.textContent = els.sizeSlider.value;
+                generateArray();
+            });
+            
+            els.speedSlider.addEventListener('input', () => {
+                els.speedValue.textContent = els.speedSlider.value;
+                updateSpeed();
+            });
+            
+            els.generateBtn.addEventListener('click', generateArray);
+            
+            els.resetBtn.addEventListener('click', () => {
+                resetSorter(true); // true means keep array but reset state
+                log('操作：重置当前数组状态', 'info');
+            });
+
+            els.customArray.addEventListener('change', parseCustomArray);
+            
+            els.sortBtn.addEventListener('click', startSort);
+            els.pauseBtn.addEventListener('click', togglePause);
+            els.stepBtn.addEventListener('click', singleStep);
+            
+            els.clearLog.addEventListener('click', () => {
+                els.terminalLog.innerHTML = '';
+            });
+
+            els.layoutBtn.addEventListener('click', toggleLayout);
+
+            // 窗口大小改变时重绘树（保证居中）
+            window.addEventListener('resize', () => {
+                if(array.length > 0) {
+                    const currentArr = heapSortState.animationQueue.length > 0 && heapSortState.currentStep > 0
+                        ? heapSortState.animationQueue[heapSortState.currentStep - 1].array 
+                        : array;
+                    const currentHeapSize = heapSortState.animationQueue.length > 0 && heapSortState.currentStep > 0
+                        ? heapSortState.animationQueue[heapSortState.currentStep - 1].heapSize
+                        : array.length;
+                    
+                    // 防抖重绘
+                    clearTimeout(window.resizeTimer);
+                    window.resizeTimer = setTimeout(() => {
+                        renderHeapTree(currentArr, currentHeapSize);
+                    }, 100);
+                }
+            });
+        });
+
+        // --- 视图切换逻辑 ---
+        function toggleLayout() {
+            isSidebarLayout = !isSidebarLayout;
+            
+            if (isSidebarLayout) {
+                els.mainLayout.classList.remove('layout-bottom');
+                els.mainLayout.classList.add('layout-side');
+                els.layoutText.textContent = '切换到底部视图';
+                els.layoutBtn.querySelector('i').className = 'fas fa-columns text-indigo-500';
+            } else {
+                els.mainLayout.classList.remove('layout-side');
+                els.mainLayout.classList.add('layout-bottom');
+                els.layoutText.textContent = '切换到侧边视图';
+                els.layoutBtn.querySelector('i').className = 'fas fa-arrow-down text-indigo-500';
+            }
+
+            // 布局切换后，树容器宽度变化，必须重绘
+            // 延时设置为550ms，略大于CSS的0.5s transition，确保高度完全撑开后再计算居中
+            setTimeout(() => {
+                const currentArr = heapSortState.isSorting && heapSortState.animationQueue.length > 0
+                    ? heapSortState.animationQueue[Math.max(0, heapSortState.currentStep - 1)].array
+                    : array;
+                const currentHeapSize = heapSortState.isSorting && heapSortState.animationQueue.length > 0
+                    ? heapSortState.animationQueue[Math.max(0, heapSortState.currentStep - 1)].heapSize
+                    : array.length;
+                
+                renderHeapTree(currentArr, currentHeapSize);
+            }, 550); 
+        }
+
+        function updateSpeed() {
+            const val = parseInt(els.speedSlider.value);
+            heapSortState.speedMs = 1000 - (val - 1) * 100;
+            if (val > 8) heapSortState.speedMs = 200 - (val - 8) * 80;
+        }
+
+        function generateArray() {
+            const size = parseInt(els.sizeSlider.value);
+            array = Array.from({length: size}, () => Math.floor(Math.random() * 99) + 1);
+            els.customArray.value = "";
+            resetSorter(false); // 重置一切
+            log(`生成新随机数组 (Size: ${size})`, 'info');
+        }
+
+        function parseCustomArray() {
+            const val = els.customArray.value.trim();
+            if (val) {
+                const parsed = val.split(/[,，\s]+/).map(Number).filter(n => !isNaN(n));
+                if (parsed.length > 0) {
+                    array = parsed.slice(0, 31);
+                    els.sizeSlider.value = array.length;
+                    els.sizeValue.textContent = array.length;
+                    resetSorter(false);
+                    log(`加载自定义数组: [${array.join(', ')}]`, 'info');
+                }
+            }
+        }
+
+        function resetSorter(keepArray = false) {
+            clearTimeout(heapSortState.currentAnimationTimer);
+            heapSortState = {
+                ...heapSortState,
+                isSorting: false,
+                isPaused: false,
+                isAnimating: false,
+                currentStep: 0,
+                totalSteps: 0,
+                animationQueue: []
+            };
+
+            updateButtons('ready');
+            updateStatus('ready');
+            els.desc.textContent = '准备开始...';
+            els.stepCount.textContent = '0 / 0';
+            renderHeapTree(array, array.length);
+        }
+
+        // --- 核心可视化: 树渲染 ---
+        function renderHeapTree(arr, heapSize) {
+            els.tree.innerHTML = '';
+            if (!arr || arr.length === 0) return;
+
+            const containerWidth = els.tree.clientWidth;
+            const containerHeight = els.tree.clientHeight;
+            const nodeSize = 40;
+            const verticalSpacing = 70; // 垂直间距
+            
+            // 计算层级
+            const depth = Math.floor(Math.log2(arr.length)) + 1;
+            
+            // 动态调整起始Y坐标，使树垂直居中
+            const totalTreeHeight = (depth - 1) * verticalSpacing + nodeSize;
+            let startY = (containerHeight - totalTreeHeight) / 2;
+            if (startY < 20) startY = 20; // 最小顶部边距
+
+            // 创建层
+            const linesLayer = document.createElement('div');
+            linesLayer.className = 'absolute inset-0 z-0';
+            els.tree.appendChild(linesLayer);
+
+            const nodesLayer = document.createElement('div');
+            nodesLayer.className = 'absolute inset-0 z-10';
+            els.tree.appendChild(nodesLayer);
+
+            const positions = [];
+            
+            for (let i = 0; i < arr.length; i++) {
+                const level = Math.floor(Math.log2(i + 1));
+                const maxNodesInLevel = Math.pow(2, level);
+                const currentInLevel = i - maxNodesInLevel + 1;
+                
+                // 经典二叉树布局算法
+                // 每一层的宽度划分
+                const sliceW = containerWidth / (maxNodesInLevel + 1);
+                const x = sliceW * (currentInLevel + 1) - nodeSize / 2;
+                const y = startY + level * verticalSpacing;
+                
+                positions.push({x, y});
+                
+                const node = document.createElement('div');
+                node.className = 'node shadow-sm';
+                
+                if (i >= heapSize) {
+                    node.classList.add('color-sorted');
+                } else if (i === 0 && heapSize > 0) {
+                    node.classList.add('color-root');
+                } else {
+                    node.classList.add('color-default');
+                }
+                
+                node.style.left = `${x}px`;
+                node.style.top = `${y}px`;
+                node.textContent = arr[i];
+                node.dataset.index = i;
+                node.id = `node-${i}`;
+                
+                nodesLayer.appendChild(node);
+
+                if (i > 0) {
+                    const parentIdx = Math.floor((i - 1) / 2);
+                    const pPos = positions[parentIdx];
+                    
+                    const line = document.createElement('div');
+                    const isLineSorted = i >= heapSize;
+                    line.className = `tree-line ${isLineSorted ? 'line-sorted' : ''}`;
+                    
+                    const startX = pPos.x + nodeSize/2;
+                    const startYPos = pPos.y + nodeSize/2;
+                    const deltaX = (x + nodeSize/2) - startX;
+                    const deltaY = (y + nodeSize/2) - startYPos;
+                    const dist = Math.sqrt(deltaX*deltaX + deltaY*deltaY);
+                    const angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
+                    
+                    line.style.width = `${dist}px`;
+                    line.style.left = `${startX}px`;
+                    line.style.top = `${startYPos}px`;
+                    line.style.transform = `rotate(${angle}deg)`;
+                    
+                    linesLayer.appendChild(line);
+                }
+            }
+        }
+
+        // --- 算法逻辑 ---
+        function generateAnimations() {
+            const queue = [];
+            const tempArr = [...array];
+            const n = tempArr.length;
+            
+            const pushState = (type, indices, desc, heapSz) => {
+                queue.push({
+                    type,
+                    indices,
+                    description: desc,
+                    array: [...tempArr],
+                    heapSize: heapSz
+                });
+            };
+
+            pushState('info', [], '开始构建最大堆 (Max Heap)', n);
+            
+            for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
+                heapify(tempArr, n, i, queue);
+            }
+            pushState('info', [], '最大堆构建完成！堆顶元素最大。', n);
+
+            for (let i = n - 1; i > 0; i--) {
+                pushState('prepareSwap', [0, i], `准备: 堆顶 ${tempArr[0]} <-> 末尾 ${tempArr[i]}`, i + 1);
+                [tempArr[0], tempArr[i]] = [tempArr[i], tempArr[0]];
+                pushState('swap', [0, i], `交换: 最大值 ${tempArr[i]} 已归位`, i);
+                heapify(tempArr, i, 0, queue);
+            }
+            
+            pushState('complete', [], '排序完成！', 0);
+            
+            heapSortState.animationQueue = queue;
+            heapSortState.totalSteps = queue.length;
+            log(`生成动画步骤: 共 ${queue.length} 步`, 'info');
+        }
+
+        function heapify(arr, n, i, queue) {
+            let largest = i;
+            const l = 2 * i + 1;
+            const r = 2 * i + 2;
+
+            queue.push({
+                type: 'check',
+                indices: [i],
+                description: `检查节点 [${i}]: ${arr[i]}`,
+                array: [...arr],
+                heapSize: n
+            });
+
+            if (l < n) {
+                queue.push({
+                    type: 'compare',
+                    indices: [largest, l],
+                    description: `比较: 父 ${arr[largest]} vs 左 ${arr[l]}`,
+                    array: [...arr],
+                    heapSize: n
+                });
+                if (arr[l] > arr[largest]) largest = l;
+            }
+
+            if (r < n) {
+                queue.push({
+                    type: 'compare',
+                    indices: [largest, r],
+                    description: `比较: 当前最大 ${arr[largest]} vs 右 ${arr[r]}`,
+                    array: [...arr],
+                    heapSize: n
+                });
+                if (arr[r] > arr[largest]) largest = r;
+            }
+
+            if (largest !== i) {
+                queue.push({
+                    type: 'prepareSwap',
+                    indices: [i, largest],
+                    description: `下沉: ${arr[i]} <-> ${arr[largest]}`,
+                    array: [...arr],
+                    heapSize: n
+                });
+
+                [arr[i], arr[largest]] = [arr[largest], arr[i]];
+
+                queue.push({
+                    type: 'swap',
+                    indices: [i, largest],
+                    description: `交换节点位置`,
+                    array: [...arr],
+                    heapSize: n
+                });
+
+                heapify(arr, n, largest, queue);
+            }
+        }
+
+        // --- 动画执行 ---
+        async function executeStep(manual = false) {
+            if (!heapSortState.isSorting || (heapSortState.isPaused && !manual)) return;
+            
+            if (heapSortState.currentStep >= heapSortState.animationQueue.length) {
+                finishSort();
+                return;
+            }
+
+            heapSortState.isAnimating = true;
+            const anim = heapSortState.animationQueue[heapSortState.currentStep];
+            
+            els.stepCount.textContent = `${heapSortState.currentStep + 1} / ${heapSortState.totalSteps}`;
+            els.desc.textContent = anim.description;
+
+            const duration = await performVisuals(anim);
+            
+            if (['swap', 'compare', 'prepareSwap'].includes(anim.type)) {
+                log(anim.description, 'step');
+            }
+
+            heapSortState.currentStep++;
+            heapSortState.isAnimating = false;
+
+            if (!manual && !heapSortState.isPaused) {
+                heapSortState.currentAnimationTimer = setTimeout(() => executeStep(), Math.max(50, duration));
+            }
+        }
+
+        async function performVisuals(anim) {
+            const getNode = (idx) => els.tree.querySelector(`[data-index="${idx}"]`);
+            
+            // 清除旧高亮
+            const nodes = els.tree.querySelectorAll('.node');
+            nodes.forEach(n => n.classList.remove('color-compare', 'color-swap', 'color-check'));
+
+            // 非 swap 操作直接重绘（保证位置绝对正确）
+            if (anim.type !== 'swap') {
+                renderHeapTree(anim.array, anim.heapSize);
+            }
+
+            switch (anim.type) {
+                case 'check':
+                    if(getNode(anim.indices[0])) getNode(anim.indices[0]).classList.add('color-check');
+                    return heapSortState.speedMs * 0.5;
+
+                case 'compare':
+                    anim.indices.forEach(idx => getNode(idx)?.classList.add('color-compare'));
+                    return heapSortState.speedMs * 0.8;
+
+                case 'prepareSwap':
+                    anim.indices.forEach(idx => getNode(idx)?.classList.add('color-swap'));
+                    return heapSortState.speedMs * 0.5;
+
+                case 'swap':
+                    // 物理交换动画
+                    const [idx1, idx2] = anim.indices;
+                    const nodeA = getNode(idx1);
+                    const nodeB = getNode(idx2);
+
+                    if (nodeA && nodeB) {
+                        nodeA.classList.add('color-swap', 'node-moving');
+                        nodeB.classList.add('color-swap', 'node-moving');
+
+                        const rectA = nodeA.getBoundingClientRect();
+                        const rectB = nodeB.getBoundingClientRect();
+                        const dx = rectB.left - rectA.left;
+                        const dy = rectB.top - rectA.top;
+
+                        nodeA.style.transform = `translate(${dx}px, ${dy}px)`;
+                        nodeB.style.transform = `translate(${-dx}px, ${-dy}px)`;
+
+                        await new Promise(r => setTimeout(r, heapSortState.speedMs));
+                        
+                        renderHeapTree(anim.array, anim.heapSize);
+                        return 50; 
+                    }
+                    renderHeapTree(anim.array, anim.heapSize);
+                    return 50;
+
+                case 'complete':
+                    renderHeapTree(anim.array, 0);
+                    return 0;
+            }
+            return heapSortState.speedMs;
+        }
+
+        // --- 控制逻辑 ---
+        async function startSort() {
+            if (heapSortState.isAnimating) return;
+            
+            if (heapSortState.currentStep >= heapSortState.totalSteps && heapSortState.totalSteps > 0) {
+                // 如果已结束，点击开始等于重置并开始
+                resetSorter(true); 
+                generateAnimations();
+            } else if (!heapSortState.isSorting) {
+                generateAnimations();
+            }
+            
+            heapSortState.isSorting = true;
+            heapSortState.isPaused = false;
+            
+            updateStatus('sorting');
+            updateButtons('sorting');
+            
+            log('▶️ 开始自动排序', 'info');
+            executeStep();
+        }
+
+        function togglePause() {
+            if (!heapSortState.isSorting) return;
+            
+            heapSortState.isPaused = !heapSortState.isPaused;
+            
+            if (heapSortState.isPaused) {
+                updateStatus('paused');
+                updateButtons('paused');
+                log('⏸️ 暂停', 'info');
+                clearTimeout(heapSortState.currentAnimationTimer);
+            } else {
+                updateStatus('sorting');
+                updateButtons('sorting');
+                log('▶️ 继续', 'info');
+                executeStep();
+            }
+        }
+
+        async function singleStep() {
+            if (heapSortState.isAnimating) return;
+
+            if (!heapSortState.isSorting) {
+                generateAnimations();
+                heapSortState.isSorting = true;
+                heapSortState.isPaused = true;
+                updateStatus('paused');
+                updateButtons('paused');
+            } 
+            
+            if (!heapSortState.isPaused) {
+                heapSortState.isPaused = true;
+                clearTimeout(heapSortState.currentAnimationTimer);
+                updateStatus('paused');
+                updateButtons('paused');
+            }
+
+            await executeStep(true);
+        }
+
+        function finishSort() {
+            heapSortState.isSorting = false;
+            heapSortState.isPaused = false;
+            updateStatus('completed');
+            updateButtons('completed');
+            log('🏆 排序完成！', 'success');
+            els.desc.innerHTML = '<span class="text-emerald-600 font-bold">全流程结束</span>';
+        }
+
+        // --- UI 辅助 ---
+        function updateButtons(state) {
+            const { sortBtn, pauseBtn, stepBtn } = els;
+            switch(state) {
+                case 'ready':
+                    sortBtn.disabled = false;
+                    pauseBtn.disabled = true;
+                    stepBtn.disabled = false;
+                    sortBtn.innerHTML = '<i class="fas fa-play"></i> 开始';
+                    break;
+                case 'sorting':
+                    sortBtn.disabled = true;
+                    pauseBtn.disabled = false;
+                    stepBtn.disabled = true;
+                    pauseBtn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+                    break;
+                case 'paused':
+                    sortBtn.disabled = false;
+                    pauseBtn.disabled = true;
+                    stepBtn.disabled = false;
+                    sortBtn.innerHTML = '<i class="fas fa-play"></i> 继续';
+                    break;
+                case 'completed':
+                    sortBtn.disabled = false;
+                    pauseBtn.disabled = true;
+                    stepBtn.disabled = true;
+                    sortBtn.innerHTML = '<i class="fas fa-redo"></i> 重来';
+                    break;
+            }
+        }
+
+        function updateStatus(state) {
+            const config = {
+                'ready': { text: '准备就绪', cls: 'dot-idle' },
+                'sorting': { text: '运行中...', cls: 'dot-running' },
+                'paused': { text: '已暂停', cls: 'dot-paused' },
+                'completed': { text: '完成', cls: 'dot-idle bg-emerald-500' }
+            };
+            const c = config[state];
+            els.statusText.textContent = c.text;
+            els.statusIndicator.className = `status-dot ${c.cls}`;
+        }
+
+        function log(msg, type='step') {
+            const div = document.createElement('div');
+            div.className = 'log-entry text-slate-600 flex items-start gap-2 border-l-2 pl-2 py-0.5';
+            
+            let colorClass = 'border-slate-300';
+            if (type === 'info') colorClass = 'border-blue-400';
+            if (type === 'success') colorClass = 'border-emerald-500 text-emerald-600 font-bold';
+            
+            div.classList.add(colorClass);
+            const time = new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' });
+            div.innerHTML = `<span class="text-[10px] text-slate-400 font-mono mt-0.5">[${time}]</span> <span class="flex-1">${msg}</span>`;
+            
+            els.terminalLog.appendChild(div);
+            els.terminalLog.scrollTop = els.terminalLog.scrollHeight;
+        }
+    </script>
+</body>
+</html>
